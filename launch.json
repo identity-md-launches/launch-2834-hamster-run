@@ -1,0 +1,52 @@
+{
+  "kind": "evm_contracts",
+  "contracts": [
+    {
+      "contract": "CoreReader",
+      "constructorArgs": [
+        "0x74665dAecA35A2303e767E76a2FF1FB6F93e119f",
+        "0x0a71C86ab63a77675002A389FDF4D096A07b11e2",
+        "0xe8a5a5aa913141ddd8951cf9fcc1375044b541773e5b0bf8ee04a5c7ac2d194d"
+      ]
+    },
+    {
+      "contract": "HamsterRunNFT",
+      "constructorArgs": [
+        "$owner"
+      ]
+    },
+    {
+      "contract": "PointsLedger",
+      "constructorArgs": [
+        "$owner"
+      ]
+    },
+    {
+      "contract": "SeasonBoard",
+      "constructorArgs": [
+        "$owner",
+        "$contract:HamsterRunNFT",
+        "$contract:PointsLedger",
+        "$contract:CoreReader"
+      ]
+    },
+    {
+      "contract": "TrainBook",
+      "constructorArgs": [
+        "$contract:HamsterRunNFT",
+        "$contract:CoreReader",
+        "$contract:SeasonBoard"
+      ]
+    },
+    {
+      "contract": "MatchBook",
+      "constructorArgs": [
+        "$contract:HamsterRunNFT",
+        "$contract:PointsLedger",
+        "$contract:SeasonBoard",
+        "$contract:CoreReader"
+      ]
+    }
+  ],
+  "notes": "HamsterRun on Sepolia: six application contracts, no token, pool, proxy or initialization call. CoreReader is the read-only adapter to the upstream SqueekCore V3 proxy 0x74665dAecA35A2303e767E76a2FF1FB6F93e119f; its constructor pins the expected V3 implementation address 0x0a71C86ab63a77675002A389FDF4D096A07b11e2 and that implementation's runtime code hash (bytes32) and makes no external call at construction. Every read checks the pin, the paused flag and the settledThroughRound frontier, so uncertified rounds revert as unknown and are never treated as zero work. HamsterRunNFT is the ERC-721 'Hamster run' (HAM), max 10,000 supply, with Stamina storage; owned by $owner (Ownable2Step, renounce disabled). PointsLedger holds non-transferable wallet-bound points; owned by $owner. SeasonBoard keeps weekly per-NFT scores (trainWork + 2 * raceDistance) and finalizes weeks; owned by $owner and wired to the NFT, ledger and reader. TrainBook books one contiguous 6-round window per NFT per genesis day and settles Stamina from certified delta cumulativeWork via the reader; it has no owner. MatchBook runs the weekly 1v1 challenge/accept/settle race flow with block-hash randomness and records raceDistance; it has no owner. After deployment the owner wallet performs the one-time wiring described in LAUNCH.md: HamsterRunNFT.configureBooks(TrainBook, MatchBook), PointsLedger.configureWriters(MatchBook, SeasonBoard), SeasonBoard.configureBooks(TrainBook, MatchBook), then optionally setMintOpen(true) or ownerMint for the demo. Not an official Squeeks product: no SQK yield, no power or merge claims, no insurance, testnet only."
+}
