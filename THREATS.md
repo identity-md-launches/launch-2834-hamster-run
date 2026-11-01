@@ -1,0 +1,51 @@
+# HamsterRun v0 threat model
+
+This is a free Sepolia game with no pooled ETH, wagering, transferable points, SQK claim, or token redemption. A successful test run is not an independent security audit. The following assumptions and residual risks are intentional and must be reassessed before attaching monetary value or a real airdrop to any output.
+
+## Certified work and upstream trust
+
+- `CoreReader` uses the named proxy and the pinned V3 tuple ABI. Every clock/work read checks version, the reported implementation address, and that implementation's runtime hash. A normal upgrade fails closed. There is no admin bypass or mutable fallback source in HamsterRun.
+- **Upstream governance and its reporter remain trusted.** Ethereum proves execution of Core's certification policy, not a sensor reading made by this application. No new sensor or reporter is introduced. A malicious proxy implementation could lie about its identity getters and work while the old implementation code still exists; the getter/hash check does not read another contract's EIP-1967 storage directly. Monitor the actual proxy implementation slot and upgrade events off-chain. Do not interpret this adapter as protection from malicious upstream governance.
+- Unknown rounds always revert training settlement, even if wall-clock time says a window ended long ago. Paused Core always defers training, even for a historical certified endpoint. Reverts preserve the booking and pending count atomically. Failed RPC reads in the UI are labeled unknown/stale, never replaced with work zero.
+- Point reads use exact `[r-1,r-1]` and `[r+5,r+5]` pages with budget zero. Frontier, exact page boundary, empty record array, equal point start/end work, monotonic cumulative work, and the six-round maximum are checked. Cumulative block units and difficulty never contribute to training.
+- No default settlement timeout converts unknown training into zero. A stalled Core can delay old seasons indefinitely. New days may still be booked; this does not make certification available. An incompatible upgrade requires a reviewed replacement game/adapter deployment and an explicit migration decision; these immutable contracts have no hidden migration power.
+
+## Authority and ownership
+
+- Every admin constructor takes the named launch owner explicitly. Factory caller and transaction origin gain no privilege. Contracts without an admin have no ownership field. Owners use OpenZeppelin two-step handover; renunciation is disabled.
+- The NFT owner may mint up to the collection cap, open/close public minting, and configure the two game writers once. It cannot directly set Stamina, confiscate NFTs, override match locks, burn, or raise the cap.
+- The PointsLedger and SeasonBoard owners configure their writer contracts once. Before configuration, production operations revert because no real caller is an authorized zero-address writer. Configuration accepts distinct deployed contract addresses, but **the owner must verify the correct implementations and links**. Pointing a writer at malicious code would grant that code the writer's authority. Those one-time choices are trust-sensitive and cannot be repaired by an admin setter.
+- Honest configured writers can award only the specified game rewards. The owner has no direct points mint. Public mint's one-address limit is not a proof of unique humanity. Owner demo minting and multiple-wallet farming affect the game economy and any proposed later snapshot.
+- Only `ownerOf` may book, challenge or accept; ERC-721 approvals are not game authority. No `tx.origin`, signed permits or off-chain authorization messages are used.
+
+## Transfer and replay boundaries
+
+- Booking identity is `(NFT ID, genesis day)`. Ownership changes never reset it. Work settlements are permissionless, once only, and attach Stamina and score to the NFT. Pending days may settle in any order and use current Stamina; this is disclosed, not a fixed per-day gain guarantee.
+- The first activity in a week snapshots that NFT's prize beneficiary. A buyer receives the NFT and its Stamina but not the seller's wallet points or previously assigned weekly prize. Match owners are separately snapshotted at acceptance. Inspect these fields when transferring NFTs.
+- An offer locks only the consenting challenger. A target owner can ignore unsolicited offers or transfer away. Acceptance locks both NFTs; cancellation is unavailable afterward. Any third party can settle or release an expired match. Approved transfers and safe transfers go through the same lock check.
+- Race and prize state is consumed before any downstream awards; a revert in a dependency rolls the whole operation back. Train settlement likewise rolls back its consumed flag if scoring or Stamina updates fail. Direct owner and duplicate calls are tested.
+- Writer dependencies are immutable or configured once. MatchBook/TrainBook and both NFT mint paths use reentrancy guards. ERC-721 mint receiver hooks are the only user callback; supply and lifetime-mint state update first. Receiver rejection and reentrant mint attempts are tested. No function makes an arbitrary user-selected external call or transfers held funds.
+
+## Randomness, race expiry and farming
+
+- Randomness uses a fixed future block, selected only after both players consent. It is publicly reproducible and domain-separated by chain, contract, match, runner and tie tag. Participant Stamina is snapshotted before that hash exists; callers do not provide seeds. The same seed cannot be replaced by another capture call.
+- **Block producers can bias or censor future hashes; this is not VRF-grade fairness.** The soft-cap calculation assumes independent uniform hash outputs. There are no stakes or real-value rewards. A monetary rollout needs an independently reviewed asynchronous randomness design and funding/recovery policy.
+- Anyone can save/settle a race. A losing participant cannot prevent an independent keeper from settling, but if everybody declines to save the seed within 256 blocks, the race expires without rewards. Selective settlement bias remains possible without active keepers. Expired accepted races still consume quotas and cooldowns; they do not earn participation points. An already saved seed has no expiry and cannot be discarded by either player.
+- Two-block hash delay is additional to the 15-second minimum; block confirmation delays may make the wait longer. Validators can slightly influence timestamps at boundaries. Timestamps are used for scheduling, not as random entropy.
+- Five-race quotas apply to both NFT and wallet, keyed by the acceptance week. A 24-hour cooldown applies to both token and wallet pairs. Transfers do not erase an NFT's quota/cooldown. Colluding wallets can still farm across many NFTs; v0 has no Sybil resistance or identity oracle.
+
+## Accounting and bounded work
+
+- Physical work and game distance remain separate in storage. Score converts them using the public immutable weight `k=2`. Race distance is a simulated game unit, not meters or certified physical work.
+- Stamina gains use bounded integer arithmetic; uint64 work times the formula factors fits uint256. Gains saturate at 10,000, zero work gains zero, and integer dust is disclosed. Race bonuses remain below 2,000 against noise in 0–9,999, bounding the unbiased global advantage below 68%.
+- A week's pending counters include all booked trains and accepted races. Late settlement updates only that original week. Finalization is impossible with pending activity; finalized scores/prizes cannot be rewritten. An ignored unaccepted challenge creates no board liability.
+- Top-ten maintenance takes at most two bounded ten-slot scans; it never loops over 10,000 NFTs. Owner mint is bounded to 50. Training reads two constant-size endpoint pages. Core must remain the trusted pinned implementation for response size and availability assumptions.
+- Ties use smaller NFT IDs, giving earlier mints deterministic tie priority. Empty/zero score seasons award nothing. Prize claims are independent and permissionless; one unclaimed prize cannot block anyone else.
+
+## Frontend, operations and review limits
+
+- The static demo uses local ABIs and a locally vendored ethers bundle. It does not load executable code from a CDN, inject on-chain metadata as HTML, accept private keys, or automatically sign. Addresses must be obtained from the confirmed launch receipt, validated on Sepolia, and linked as one contract graph. Graph consistency alone is not proof of audited bytecode; compare the explorer verification and receipt before signing.
+- Network/account changes clear the wallet signer. Transaction paths check Sepolia and the selected address again, simulate first, and display receipt links. Reads use a common block per refresh; confirmations can reorg. Snapshot/indexer operators should pin a sufficiently finalized block and roll back orphaned events.
+- The owner must complete all three one-time configuration calls before opening public minting. Keepers must monitor pending matches frequently enough to save block hashes. The operator must monitor upstream lag and upgrade identity. Neither the worker nor the network factory becomes an ongoing game operator.
+- Included tests cover constructor/factory ownership, code size and forbidden-opcode reachability, standard NFT behavior, mint cap/callbacks, certification failure modes, clock boundaries, replay, custody-free points, match expiry, quotas, scoring, and deterministic fuzz properties. Tests use a local ABI-faithful Core fixture; the live integration check separately reads the real proxy. No production randomness guarantee follows from mocked hashes.
+- Slither, Mythril and an independent adversarial audit were not run by this worker. The network's later independent review and deployment simulation remain required launch steps. Residual governance, Sybil, randomness and keeper risks are not cured by passing tests.

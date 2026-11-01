@@ -1,0 +1,28 @@
+{
+  "chainId": 11155111,
+  "blockNumber": 12042124,
+  "blockHash": "0xf8f2a4e58c89fae1d16271460517b9e49f54016a39bf6b652cb005ef087f8eef",
+  "blockTimestamp": 1793549616,
+  "blockTimeUTC": "2026-11-01T16:13:36+00:00",
+  "core": "0x74665dAecA35A2303e767E76a2FF1FB6F93e119f",
+  "proxyRuntimeHash": "0x2fa365e78347ab7e3bef1ac176b46ec67393fbdbf1733867bf863e25cd13a516",
+  "implementation": "0x0a71c86ab63a77675002a389fdf4d096a07b11e2",
+  "implementationVersion": 3,
+  "implementationRuntimeHash": "0xe8a5a5aa913141ddd8951cf9fcc1375044b541773e5b0bf8ee04a5c7ac2d194d",
+  "genesisTimestamp": 1791847800,
+  "roundDuration": 600,
+  "maxWorkPerRound": 10000,
+  "currentRound": 2837,
+  "settledThroughRound": 1973,
+  "closedUnknownRounds": 863,
+  "paused": false,
+  "cumulativeWork": 148986,
+  "historicalEndpointRead": {
+    "afterRound": 1967,
+    "throughRound": 1973,
+    "startCumulativeWork": 148986,
+    "endCumulativeWork": 148986,
+    "physicalWorkDelta": 0
+  },
+  "note": "Historical read-only observation, not a HamsterRun training award or a game deployment. New bookings must select future rounds."
+}

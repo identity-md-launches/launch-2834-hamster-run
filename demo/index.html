@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#244b3c">
+  <meta name="description" content="HamsterRun is an independent Sepolia game demo. Train with certified physical work, race, and collect wallet-bound points.">
+  <title>HamsterRun · a little work, a little race</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="shell header">
+    <a class="wordmark" href="./"><span aria-hidden="true">◉</span> HamsterRun</a>
+    <div class="header-actions"><span class="pill">SEPOLIA / v0</span><button id="connect">Connect wallet</button></div>
+  </header>
+  <main class="shell">
+    <section class="hero">
+      <div><p class="eyebrow">SMALL HAMSTER. DAILY HABIT.</p><h1>A little work.<br>A little race.</h1>
+        <p class="intro">Pick an hour. Build Stamina from certified physical work. Meet a rival on the track.</p>
+        <p class="honesty">Independent game NFTs, separate from official Squeeks mining NFTs. No sensors, SQK yield, or real-value prizes.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true"><div class="wheel"><img src="hamster.svg" alt=""></div><span class="art-caption">10,000 HAM · ONE DAILY WINDOW</span></div>
+    </section>
+
+    <div id="core-banner" class="banner" role="status" aria-live="polite">Reading Core certification… Unknown work is never counted as zero.</div>
+    <div class="status-row"><span id="deployment-status">Deployment pending · awaiting confirmed Sepolia addresses.</span><button id="refresh" class="text-button">Refresh reads</button></div>
+    <p id="message" class="message" role="status" aria-live="polite">Connect a Sepolia wallet when the deployment is available.</p>
+
+    <section class="stats" aria-label="Your game status">
+      <div><span>YOUR STAMINA</span><strong id="stamina">—</strong><small id="token-owner">Select an NFT below</small></div>
+      <div><span>WALLET POINTS</span><strong id="points">—</strong><small>Stay with your address</small></div>
+      <div><span>COLLECTION</span><strong id="supply">— / 10,000</strong><small>Hamster run · HAM</small></div>
+      <div><span>GENESIS CALENDAR</span><strong id="calendar">—</strong><small id="snapshot">Waiting for a chain snapshot</small></div>
+    </section>
+
+    <div class="game-grid">
+      <section class="card">
+        <p class="eyebrow">01 / DAILY TRAIN</p><h2>Your one-hour window.</h2>
+        <div class="inline"><label>NFT ID<input id="token-id" type="number" min="1" max="10000" value="1"></label><button id="load-token" class="secondary">Load NFT</button><button id="mint" data-write disabled>Free mint</button></div>
+        <p class="hint">One free public mint per wallet, while open. The owner can also mint demo NFTs.</p>
+        <label>First round of your six-round window<input id="start-round" type="number" min="1" inputmode="numeric"></label>
+        <p class="hint" id="window-hint">Six future rounds, all inside the current day.</p>
+        <button id="book" data-write disabled>Book today's window</button>
+        <div class="divider"></div>
+        <label>Booked day to settle (day 0 starts at Core genesis)<input id="train-day" type="number" min="0" inputmode="numeric"></label>
+        <p class="readout" id="booking-status">No booking read yet.</p>
+        <button id="settle-train" class="secondary" data-write disabled>Settle certified training</button>
+        <p class="hint">No catch-up bookings. A missed day earns no training. Core delays preserve existing bookings.</p>
+      </section>
+
+      <section class="card">
+        <p class="eyebrow">02 / WEEKLY 1v1</p><h2>A chance, never a promise.</h2>
+        <p class="hint">Match within your Stamina band. Higher Stamina helps, but even the largest possible advantage stays below a 68% expected win rate.</p>
+        <label>Opponent NFT ID<input id="opponent-id" type="number" min="1" max="10000" value="2"></label>
+        <button id="challenge" data-write disabled>Challenge with selected NFT</button>
+        <p id="quota" class="hint">Five accepted races per NFT and wallet per week. One-day rematch cooldown.</p>
+        <div class="divider"></div>
+        <label>Match ID<input id="match-id" type="number" min="1" inputmode="numeric" value="1"></label>
+        <div class="button-row"><button id="load-match" class="secondary">Read match</button><button id="accept" data-write disabled>Accept</button><button id="settle-match" data-write disabled>Settle race</button></div>
+        <p id="race-status" class="readout">Choose a match to see its state.</p>
+        <div class="race-course" id="race-course" aria-label="15-second replay of the recorded race result"><div class="lane"><span id="runner-a"><img src="hamster.svg" alt="First runner"></span></div><div class="lane"><span id="runner-b"><img src="hamster.svg" alt="Second runner"></span></div></div>
+        <button id="replay" class="text-button" disabled>Replay result · 15 seconds</button>
+        <details><summary>Save randomness or release an unused challenge</summary><p class="hint">Anyone can save the future block hash within 256 blocks. A saved seed can settle later. Expired unsaved races give no result and still consume the weekly quota.</p><div class="button-row"><button id="capture" class="secondary" data-write disabled>Save hash</button><button id="cancel" class="secondary" data-write disabled>Cancel offer</button><button id="expire" class="secondary" data-write disabled>Expire</button></div></details>
+      </section>
+    </div>
+
+    <section class="card board-card">
+      <div class="section-top"><div><p class="eyebrow">03 / WEEKLY BOARD</p><h2>Every bit of work counts.</h2></div><label>Week<input id="board-week" type="number" min="0" inputmode="numeric"></label></div>
+      <p class="hint">Score = physical trainWork + <strong>2 × game raceDistance</strong>. One work unit is one score point; one race unit is two. The conversion is a game rule, not a physical distance claim.</p>
+      <p id="board-status" class="readout">Scores will appear after deployment.</p>
+      <div class="table-scroll"><table><thead><tr><th>Rank</th><th>NFT</th><th>Train work</th><th>Race distance</th><th>Score</th><th>Prize points</th></tr></thead><tbody id="board-body"><tr><td colspan="6">No chain data loaded.</td></tr></tbody></table></div>
+      <div class="button-row"><button id="load-board" class="secondary">Read week</button><button id="finalize" data-write disabled>Finalize completed week</button><button id="claim-prize" class="secondary" data-write disabled>Claim selected NFT's tier</button></div>
+      <p class="hint">Ranks 1 / 2–3 / 4–10 earn 300 / 150 / 50 address points. The first activity's owner is that NFT's prize recipient for the week. Finalization waits for every booked train and accepted race.</p>
+    </section>
+
+    <details class="setup card"><summary>Deployment &amp; contract addresses</summary>
+      <p id="address-note">This page never invents deployment addresses. The network deployer supplies the confirmed six-contract set. Advanced users can load that same set here; check it against the launch receipt before signing.</p>
+      <label>Confirmed contract map (JSON)<textarea id="addresses" rows="8" spellcheck="false" placeholder="Paste the confirmed contracts object from the deployment receipt"></textarea></label>
+      <button id="load-deployment" class="secondary">Verify and use these addresses</button>
+      <ul id="contract-links"></ul>
+    </details>
+    <footer><strong>HamsterRun</strong><p>An honest testnet experiment. Points are non-transferable wallet counters. No token launch or airdrop is promised. Randomness uses a future block hash and can be influenced by validators; this game has no stakes.</p><a href="https://docs.squeekchain.com/developers/core/" target="_blank" rel="noopener noreferrer">SqueekCore V3 reference ↗</a></footer>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
