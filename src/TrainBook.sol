@@ -41,7 +41,7 @@ contract TrainBook is ReentrancyGuard {
     /// No catch-up bookings and no reading partial work before selecting a window.
     function book(uint256 tokenId, uint64 startRound) external nonReentrant {
         if (nft.ownerOf(tokenId) != msg.sender) revert NotTokenOwner();
-        (uint64 currentRound, uint256 day, uint256 week) = reader.clock();
+        (uint64 currentRound, uint256 day, uint256 week) = reader.tick();
         if (bookings[tokenId][day].startRound != 0) revert AlreadyBooked();
         if (
             startRound <= currentRound || (uint256(startRound) - 1) / 144 != day
@@ -53,6 +53,7 @@ contract TrainBook is ReentrancyGuard {
     }
 
     /// @notice Anyone may settle; gain stays with the NFT. Unknown or paused reads revert atomically.
+    /// A booking settled after its week was finalized still trains the NFT; the board reports it as excluded.
     function settle(uint256 tokenId, uint256 day) external nonReentrant returns (uint64 work, uint256 gain) {
         Booking storage booking = bookings[tokenId][day];
         if (booking.startRound == 0 || booking.settled) revert NoPendingBooking();

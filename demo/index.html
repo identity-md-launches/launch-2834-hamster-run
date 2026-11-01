@@ -66,7 +66,7 @@
 
     <section class="card board-card">
       <div class="section-top"><div><p class="eyebrow">03 / WEEKLY BOARD</p><h2>Every bit of work counts.</h2></div><label>Week<input id="board-week" type="number" min="0" inputmode="numeric"></label></div>
-      <p class="hint">Score = physical trainWork + <strong>2 × game raceDistance</strong>. One work unit is one score point; one race unit is two. The conversion is a game rule, not a physical distance claim.</p>
+      <p class="hint">Score = physical trainWork + <strong>game raceDistance ÷ 100</strong> (k = 1/100, rounded down on the week's summed distance). One work unit is one score point; one race is worth 100–219 points. Weeks finalize once their trains settle and races resolve, or two weeks after the week end with still-uncertified bookings excluded (never counted as zero). The conversion is a game rule, not a physical distance claim.</p>
       <p id="board-status" class="readout">Scores will appear after deployment.</p>
       <div class="table-scroll"><table><thead><tr><th>Rank</th><th>NFT</th><th>Train work</th><th>Race distance</th><th>Score</th><th>Prize points</th></tr></thead><tbody id="board-body"><tr><td colspan="6">No chain data loaded.</td></tr></tbody></table></div>
       <div class="button-row"><button id="load-board" class="secondary">Read week</button><button id="finalize" data-write disabled>Finalize completed week</button><button id="claim-prize" class="secondary" data-write disabled>Claim selected NFT's tier</button></div>

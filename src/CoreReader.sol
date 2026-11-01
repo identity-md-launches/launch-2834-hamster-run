@@ -3,7 +3,10 @@ pragma solidity 0.8.26;
 
 import {ISqueekCoreV3} from "./interfaces/ISqueekCoreV3.sol";
 
-/// @notice Immutable adapter. An upstream identity change fails closed and requires a reviewed new deployment.
+/// @notice Immutable adapter. Work reads fail closed on an upstream identity change and require a reviewed
+/// new deployment. The calendar (round, day, week, week end) is a pure function of the stream's genesis,
+/// which never changes, so it is pinned on the first successful identity-checked read and no longer
+/// depends on the live implementation afterwards: an upstream upgrade cannot strand finished weeks.
 contract CoreReader {
     uint256 public constant ROUND_SECONDS = 600;
     uint256 public constant ROUNDS_PER_DAY = 144;
@@ -11,6 +14,8 @@ contract CoreReader {
     ISqueekCoreV3 public immutable core;
     address public immutable expectedImplementation;
     bytes32 public immutable expectedRuntimeHash;
+    /// @notice Zero until pinned by the first identity-checked read; write-once afterwards.
+    uint64 public genesisTimestamp;
 
     error InvalidConfiguration();
     error CoreIdentityChanged();
@@ -19,6 +24,8 @@ contract CoreReader {
     error UnknownRounds(uint64 requested, uint64 frontier);
     error InvalidWindow();
     error InvalidEndpoint();
+
+    event GenesisPinned(uint64 genesisTimestamp);
 
     constructor(address core_, address implementation_, bytes32 runtimeHash_) {
         if (core_ == address(0) || implementation_ == address(0) || runtimeHash_ == bytes32(0)) {
@@ -29,6 +36,7 @@ contract CoreReader {
         expectedRuntimeHash = runtimeHash_;
     }
 
+    /// @notice Identity-checked live configuration. Reverts on any upstream identity or timing change.
     function configuration() public view returns (ISqueekCoreV3.CoreConfiguration memory config) {
         if (
             core.implementationCodeVersion() != 3
@@ -36,18 +44,42 @@ contract CoreReader {
                 || expectedImplementation.codehash != expectedRuntimeHash
         ) revert CoreIdentityChanged();
         config = core.configuration();
+        uint64 pinned = genesisTimestamp;
         if (
             config.genesisTimestamp == 0 || config.roundDuration != ROUND_SECONDS
-                || config.maxWorkPerRound == 0
+                || config.maxWorkPerRound == 0 || (pinned != 0 && config.genesisTimestamp != pinned)
         ) {
             revert InvalidConfiguration();
         }
     }
 
+    /// @notice Pinned genesis when available, otherwise the identity-checked live value.
+    function genesis() public view returns (uint256) {
+        uint64 pinned = genesisTimestamp;
+        return pinned != 0 ? pinned : configuration().genesisTimestamp;
+    }
+
+    /// @notice Permissionless and write-once. The books call it on every booking, challenge and
+    /// acceptance, so the calendar is pinned by the first game action at the latest.
+    function pinGenesis() public returns (uint64 pinned) {
+        pinned = genesisTimestamp;
+        if (pinned == 0) {
+            pinned = configuration().genesisTimestamp;
+            genesisTimestamp = pinned;
+            emit GenesisPinned(pinned);
+        }
+    }
+
+    /// @notice State-changing clock for the books: pins the genesis, then reads the calendar.
+    function tick() external returns (uint64 currentRound, uint256 day, uint256 week) {
+        pinGenesis();
+        return clock();
+    }
+
     function clock() public view returns (uint64 currentRound, uint256 day, uint256 week) {
-        uint256 genesis = configuration().genesisTimestamp;
-        if (block.timestamp < genesis) revert BeforeGenesis();
-        uint256 elapsed = block.timestamp - genesis;
+        uint256 genesis_ = genesis();
+        if (block.timestamp < genesis_) revert BeforeGenesis();
+        uint256 elapsed = block.timestamp - genesis_;
         uint256 round = elapsed / ROUND_SECONDS + 1;
         if (round > type(uint64).max) revert InvalidConfiguration();
         return (uint64(round), elapsed / 1 days, elapsed / 1 weeks);
@@ -63,10 +95,11 @@ contract CoreReader {
     }
 
     function weekEnd(uint256 week) public view returns (uint256) {
-        return uint256(configuration().genesisTimestamp) + (week + 1) * 1 weeks;
+        return genesis() + (week + 1) * 1 weeks;
     }
 
     /// @notice Exact physical-work delta for [startRound, startRound+5]. No page truncation is accepted.
+    /// Always identity-checked: an upstream change defers settlement instead of inventing work.
     function windowWork(uint64 startRound) external view returns (uint64 work) {
         if (startRound == 0 || startRound > type(uint64).max - 5) revert InvalidWindow();
         ISqueekCoreV3.CoreConfiguration memory config = configuration();

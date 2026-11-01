@@ -1,7 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {GameFixture, SeasonBoard, HamsterRunNFT, GameAdmin, PointsLedger} from "./GameFixture.sol";
+import {
+    GameFixture,
+    SeasonBoard,
+    HamsterRunNFT,
+    GameAdmin,
+    PointsLedger,
+    CoreReader,
+    GameMath
+} from "./GameFixture.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 
@@ -237,8 +245,8 @@ contract SeasonAndNFTTest is GameFixture {
         assertEq(top[1], 15);
         vm.prank(address(matches));
         board.registerMatch(0, 1, 2, alice, bob);
-        vm.prank(address(matches));
-        board.recordMatch(0, 1, 2, 1000, 2000);
+        vm.prank(address(matches)); // One hundred race units are one score point, rounded down.
+        board.recordMatch(0, 1, 2, 200_099, 400_050);
         assertEq(board.score(0, 1), 2000);
         assertEq(board.score(0, 2), 4000);
         top = board.leaders(0);
@@ -253,6 +261,112 @@ contract SeasonAndNFTTest is GameFixture {
         assertEq(board.prize(0, 15), 50);
         assertEq(board.prize(0, 3), 0);
         assertEq(board.prize(0, 0), 0);
+    }
+
+    function testCompletedWeekFinalizesAndPaysAfterCoreUpgrade() public {
+        _book(1, alice, 2);
+        _certify(2, 1000);
+        train.settle(1, 0);
+        assertEq(board.pendingTrains(0), 0);
+        vm.warp(GENESIS + 1 weeks);
+        core.setIdentity(address(0xBEEF), 4);
+        vm.expectRevert(CoreReader.CoreIdentityChanged.selector);
+        reader.configuration();
+        board.finalize(0);
+        assertTrue(board.finalized(0));
+        assertEq(board.prize(0, 1), 300);
+        board.claimPrize(0, 1);
+        assertEq(ledger.points(alice), 300);
+    }
+
+    function testGraceFinalizeExcludesUncertifiedBookingWhichStillTrainsLater() public {
+        _book(1, alice, 2);
+        vm.prank(bob);
+        uint256 id = matches.challenge(2, 3);
+        vm.prank(carol);
+        matches.accept(id);
+        _raceReady(id, keccak256("grace"));
+        matches.settle(id);
+        uint256 end = reader.weekEnd(0);
+        assertEq(end, GENESIS + 1 weeks);
+        vm.warp(end + board.FINALIZE_GRACE() - 1);
+        vm.expectRevert(SeasonBoard.SeasonNotReady.selector);
+        board.finalize(0);
+        vm.warp(end + board.FINALIZE_GRACE());
+        vm.expectEmit(true, false, false, true);
+        emit SeasonBoard.SeasonFinalized(0, 1);
+        board.finalize(0);
+        uint256[10] memory top = board.leaders(0);
+        assertTrue(top[0] == 2 || top[0] == 3);
+        assertEq(board.prize(0, top[0]), 300);
+        board.claimPrize(0, top[0]);
+        assertEq(ledger.points(top[0] == 2 ? bob : carol), 300 + 10);
+        assertEq(board.pendingTrains(0), 1);
+        // The booking is still unknown, never zero; it certifies later and trains the NFT.
+        vm.expectRevert(abi.encodeWithSelector(CoreReader.UnknownRounds.selector, uint64(7), uint64(0)));
+        train.settle(1, 0);
+        _certify(2, 1000);
+        vm.expectEmit(true, true, false, true);
+        emit SeasonBoard.LateTrainExcluded(0, 1, 1000);
+        (uint64 work, uint256 gain) = train.settle(1, 0);
+        assertEq(work, 1000);
+        assertEq(gain, 100);
+        assertEq(nft.stamina(1), 100);
+        assertEq(board.pendingTrains(0), 0);
+        assertEq(board.score(0, 1), 0);
+        assertEq(board.leaders(0)[0], top[0]);
+        assertEq(board.prize(0, 1), 0);
+    }
+
+    function testGraceNeverWaivesAcceptedRaces() public {
+        uint256 id = _startRace();
+        vm.warp(reader.weekEnd(0) + board.FINALIZE_GRACE());
+        vm.expectRevert(SeasonBoard.SeasonNotReady.selector);
+        board.finalize(0);
+        vm.roll(matches.races(id).randomBlock + 257);
+        matches.expire(id);
+        board.finalize(0);
+    }
+
+    function testCertifiedTrainingWeekOutranksRacesUnderPublishedConversion() public {
+        address dave = makeAddr("Dave");
+        vm.prank(admin);
+        nft.ownerMint(dave, 1); // token 4
+        vm.prank(bob);
+        uint256 first = matches.challenge(2, 3);
+        vm.prank(carol);
+        matches.accept(first);
+        _raceReady(first, keccak256("race one"));
+        matches.settle(first);
+        vm.prank(bob);
+        uint256 second = matches.challenge(2, 4);
+        vm.prank(dave);
+        matches.accept(second);
+        _raceReady(second, keccak256("race two"));
+        matches.settle(second);
+        uint256 racerScore = board.score(0, 2);
+        assertGt(racerScore, 0);
+        assertLe(racerScore, uint256(2 * 21_959) / 100);
+        // Seven windows at the largest six-round delta certified on the live Core (3,226).
+        uint64 cumulative;
+        for (uint64 day; day < 7; ++day) {
+            vm.warp(uint256(GENESIS) + day * 1 days);
+            uint64 start = day * 144 + 2;
+            _book(1, alice, start);
+            core.setPoint(start - 1, cumulative, 0);
+            cumulative += 3226;
+            core.setPoint(start + 5, cumulative, 0);
+            core.setFrontier(start + 5);
+            vm.warp(uint256(GENESIS) + uint256(start + 5) * 600);
+            train.settle(1, day);
+        }
+        assertEq(board.score(0, 1), 7 * 3226);
+        assertEq(board.leaders(0)[0], 1);
+        // Five maximal races stay below a week of windows at the live average (about 453 per window).
+        assertLt(5 * GameMath.raceDistance(10_000, 9999) / board.RACE_UNITS_PER_POINT(), 7 * 453);
+        // One race is worth between 100 and 219 points.
+        assertEq(GameMath.raceDistance(0, 0) / board.RACE_UNITS_PER_POINT(), 100);
+        assertEq(GameMath.raceDistance(10_000, 9999) / board.RACE_UNITS_PER_POINT(), 219);
     }
 
     function testBoardRejectsUnauthorizedRecordsAndWrongWeek() public {

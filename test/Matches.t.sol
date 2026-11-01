@@ -25,8 +25,8 @@ contract MatchesTest is GameFixture {
         assertEq(ledger.points(loser), 1);
         assertEq(ledger.totalPoints(), 11);
         assertEq(ledger.points(carol), 0);
-        assertEq(board.score(0, 1), race.firstDistance * 2);
-        assertEq(board.score(0, 2), race.secondDistance * 2);
+        assertEq(board.score(0, 1), race.firstDistance / 100);
+        assertEq(board.score(0, 2), race.secondDistance / 100);
         assertEq(board.pendingMatches(0), 0);
         assertFalse(nft.matchLocked(1));
         assertFalse(nft.matchLocked(2));
@@ -228,6 +228,36 @@ contract MatchesTest is GameFixture {
         vm.prank(alice);
         vm.expectRevert(MatchBook.BandMismatch.selector);
         matches.challenge(1, 2);
+    }
+
+    function testBandBoundariesAndCappedHamsterCanRaceTopBand() public {
+        assertEq(matches.band(0), 0);
+        assertEq(matches.band(1999), 0);
+        assertEq(matches.band(2000), 1);
+        assertEq(matches.band(7999), 3);
+        assertEq(matches.band(8000), 4);
+        assertEq(matches.band(9999), 4);
+        assertEq(matches.band(10_000), 4);
+        assertEq(matches.band(type(uint256).max), 4);
+        for (uint256 i; i < 1000 && nft.stamina(1) < 10_000; ++i) {
+            vm.prank(address(train));
+            nft.applyTraining(1, 60_000);
+        }
+        for (uint256 i; i < 1000 && nft.stamina(2) < 8000; ++i) {
+            vm.prank(address(train));
+            nft.applyTraining(2, 60_000);
+        }
+        assertEq(nft.stamina(1), 10_000);
+        assertGe(nft.stamina(2), 8000);
+        assertLt(nft.stamina(2), 10_000);
+        vm.prank(carol); // Token 3 has Stamina 0: a different band.
+        vm.expectRevert(MatchBook.BandMismatch.selector);
+        matches.challenge(3, 1);
+        vm.prank(alice);
+        uint256 id = matches.challenge(1, 2);
+        vm.prank(bob);
+        matches.accept(id);
+        assertEq(matches.races(id).firstStamina, 10_000);
     }
 
     function testTrainingDuringRaceDoesNotChangeItsSnapshot() public {

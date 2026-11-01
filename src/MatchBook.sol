@@ -100,13 +100,19 @@ contract MatchBook is ReentrancyGuard {
         return _races[matchId];
     }
 
+    /// @notice Five bands of 2,000 Stamina. The exact cap belongs to the top band, not to a band of its own.
+    function band(uint256 stamina) public pure returns (uint256) {
+        if (stamina >= GameMath.MAX_STAMINA) stamina = GameMath.MAX_STAMINA - 1;
+        return stamina / BAND_SIZE;
+    }
+
     function challenge(uint256 first, uint256 second) external nonReentrant returns (uint256 id) {
         if (nft.ownerOf(first) != msg.sender) revert NotTokenOwner();
         address opponent = nft.ownerOf(second);
         if (first == second || opponent == msg.sender) revert InvalidOpponent();
         if (activeMatch[first] != 0 || activeMatch[second] != 0) revert TokenBusy();
-        if (nft.stamina(first) / BAND_SIZE != nft.stamina(second) / BAND_SIZE) revert BandMismatch();
-        (,, uint256 week) = reader.clock();
+        if (band(nft.stamina(first)) != band(nft.stamina(second))) revert BandMismatch();
+        (,, uint256 week) = reader.tick();
         _checkLimit(week, first, msg.sender);
         _checkLimit(week, second, opponent);
         _checkCooldown(first, second, msg.sender, opponent);
@@ -130,13 +136,13 @@ contract MatchBook is ReentrancyGuard {
         if (race.state != State.Offered) revert WrongState();
         if (msg.sender != race.secondOwner || nft.ownerOf(race.second) != msg.sender) revert NotTokenOwner();
         if (activeMatch[race.second] != 0) revert TokenBusy();
-        (,, uint256 week) = reader.clock();
+        (,, uint256 week) = reader.tick();
         if (week != race.week || block.timestamp >= race.offeredAt + CHALLENGE_TTL) {
             revert ChallengeExpired();
         }
         uint256 firstStamina = nft.stamina(race.first);
         uint256 secondStamina = nft.stamina(race.second);
-        if (firstStamina / BAND_SIZE != secondStamina / BAND_SIZE) revert BandMismatch();
+        if (band(firstStamina) != band(secondStamina)) revert BandMismatch();
         _checkLimit(week, race.first, race.firstOwner);
         _checkLimit(week, race.second, msg.sender);
         _checkCooldown(race.first, race.second, race.firstOwner, msg.sender);

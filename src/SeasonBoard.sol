@@ -7,8 +7,15 @@ import {HamsterRunNFT} from "./HamsterRunNFT.sol";
 import {PointsLedger} from "./PointsLedger.sol";
 
 contract SeasonBoard is GameAdmin {
-    /// @notice One physical work unit = one score point; one game race unit = TWO score points.
-    uint256 public constant RACE_WORK_WEIGHT = 2;
+    /// @notice Published conversion k = 1 / RACE_UNITS_PER_POINT: one physical work unit is one score
+    /// point; one hundred game race units are one score point, applied to the week's summed race
+    /// distance and rounded down. A race (10,000-21,959 units) is therefore worth 100-219 points, so
+    /// five races cannot outweigh a typical certified training day (hundreds of work units per window).
+    uint256 public constant RACE_UNITS_PER_POINT = 100;
+    /// @notice After the week end plus this grace, finalize may proceed with bookings the Core has not
+    /// certified yet. Those bookings are excluded from the board (never counted as zero work) and
+    /// still train the NFT whenever they certify.
+    uint256 public constant FINALIZE_GRACE = 2 weeks;
     uint256 public constant TOP_SIZE = 10;
     HamsterRunNFT public immutable nft;
     PointsLedger public immutable ledger;
@@ -39,7 +46,8 @@ contract SeasonBoard is GameAdmin {
     event ScoreChanged(
         uint256 indexed week, uint256 indexed tokenId, uint256 trainWork, uint256 raceDistance
     );
-    event SeasonFinalized(uint256 indexed week);
+    event SeasonFinalized(uint256 indexed week, uint256 unsettledTrains);
+    event LateTrainExcluded(uint256 indexed week, uint256 indexed tokenId, uint64 work);
     event PrizeClaimed(
         uint256 indexed week, uint256 indexed tokenId, address indexed beneficiary, uint256 points
     );
@@ -67,10 +75,15 @@ contract SeasonBoard is GameAdmin {
         ++pendingTrains[week];
     }
 
+    /// @notice Work certified after a grace-period finalization is reported, not scored: finalized
+    /// tables never change. The NFT's Stamina gain is applied by TrainBook regardless.
     function recordTrain(uint256 week, uint256 tokenId, uint64 work) external {
         if (msg.sender != trainBook) revert Unauthorized();
-        if (finalized[week]) revert SeasonClosed();
         --pendingTrains[week];
+        if (finalized[week]) {
+            emit LateTrainExcluded(week, tokenId, work);
+            return;
+        }
         entries[week][tokenId].trainWork += work;
         _updateTop(week, tokenId);
     }
@@ -124,7 +137,7 @@ contract SeasonBoard is GameAdmin {
 
     function score(uint256 week, uint256 tokenId) public view returns (uint256) {
         Entry storage entry = entries[week][tokenId];
-        return entry.trainWork + RACE_WORK_WEIGHT * entry.raceDistance;
+        return entry.trainWork + entry.raceDistance / RACE_UNITS_PER_POINT;
     }
 
     function leaders(uint256 week) external view returns (uint256[10] memory) {
@@ -161,13 +174,19 @@ contract SeasonBoard is GameAdmin {
         }
     }
 
+    /// @notice Permissionless. Needs the week end, every accepted race resolved (anyone can expire a
+    /// stale one), and every booked train settled, unless the grace period has also passed: then the
+    /// still-uncertified bookings are excluded and reported, so one lagging booking cannot hold every
+    /// other player's prizes forever. The week end depends only on the pinned genesis, so an upstream
+    /// identity change cannot block finalization.
     function finalize(uint256 week) external {
         if (finalized[week]) revert SeasonClosed();
-        if (block.timestamp < reader.weekEnd(week) || pendingTrains[week] != 0 || pendingMatches[week] != 0) {
-            revert SeasonNotReady();
-        }
+        uint256 end = reader.weekEnd(week);
+        if (block.timestamp < end || pendingMatches[week] != 0) revert SeasonNotReady();
+        uint256 unsettled = pendingTrains[week];
+        if (unsettled != 0 && block.timestamp < end + FINALIZE_GRACE) revert SeasonNotReady();
         finalized[week] = true;
-        emit SeasonFinalized(week);
+        emit SeasonFinalized(week, unsettled);
     }
 
     function prize(uint256 week, uint256 tokenId) public view returns (uint256) {

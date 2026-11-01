@@ -194,6 +194,45 @@
     },
     {
       "type": "function",
+      "name": "genesis",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "genesisTimestamp",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "pinGenesis",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "pinned",
+          "type": "uint64",
+          "internalType": "uint64"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
       "name": "status",
       "inputs": [],
       "outputs": [
@@ -219,6 +258,29 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "tick",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "currentRound",
+          "type": "uint64",
+          "internalType": "uint64"
+        },
+        {
+          "name": "day",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        {
+          "name": "week",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable"
     },
     {
       "type": "function",
@@ -257,6 +319,19 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "event",
+      "name": "GenesisPinned",
+      "inputs": [
+        {
+          "name": "genesisTimestamp",
+          "type": "uint64",
+          "indexed": false,
+          "internalType": "uint64"
+        }
+      ],
+      "anonymous": false
     },
     {
       "type": "error",
@@ -1577,7 +1652,20 @@
     },
     {
       "type": "function",
-      "name": "RACE_WORK_WEIGHT",
+      "name": "FINALIZE_GRACE",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "RACE_UNITS_PER_POINT",
       "inputs": [],
       "outputs": [
         {
@@ -2121,6 +2209,31 @@
     },
     {
       "type": "event",
+      "name": "LateTrainExcluded",
+      "inputs": [
+        {
+          "name": "week",
+          "type": "uint256",
+          "indexed": true,
+          "internalType": "uint256"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint256",
+          "indexed": true,
+          "internalType": "uint256"
+        },
+        {
+          "name": "work",
+          "type": "uint64",
+          "indexed": false,
+          "internalType": "uint64"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "event",
       "name": "OwnershipTransferStarted",
       "inputs": [
         {
@@ -2227,6 +2340,12 @@
           "name": "week",
           "type": "uint256",
           "indexed": true,
+          "internalType": "uint256"
+        },
+        {
+          "name": "unsettledTrains",
+          "type": "uint256",
+          "indexed": false,
           "internalType": "uint256"
         }
       ],
@@ -2710,6 +2829,25 @@
         }
       ],
       "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "band",
+      "inputs": [
+        {
+          "name": "stamina",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "stateMutability": "pure"
     },
     {
       "type": "function",

@@ -47,7 +47,7 @@ function readableError(error) {
   const explanations = {
     UnknownRounds: "Core has not certified the whole window. This booking remains pending; retry later.",
     CorePaused: "Core is paused. Training remains pending; retry after it resumes.",
-    CoreIdentityChanged: "Core's pinned identity changed. Training is deferred for integration review.",
+    CoreIdentityChanged: "Core's pinned identity changed. Training settlement is deferred for integration review; booking, racing and finalizing continue from the pinned genesis.",
     InvalidWindow: "Choose six future rounds entirely inside today's genesis-aligned day.",
     AlreadyBooked: "This NFT already booked a window today, including before a transfer.",
     NoPendingBooking: "There is no unsettled booking for that NFT and day.",
@@ -60,7 +60,7 @@ function readableError(error) {
     BandMismatch: "These NFTs are in different Stamina bands (2,000 Stamina per band).",
     TokenBusy: "One of these NFTs is already in a challenge or race.",
     InMatch: "The NFT is locked while its challenge or race is active.",
-    SeasonNotReady: "The week must end and all its booked trains and accepted races must resolve.",
+    SeasonNotReady: "The week must end, its accepted races must resolve, and its booked trains must settle (or two weeks must pass since the week end).",
     NoPrize: "This NFT has no unclaimed finalized prize in that week.",
     MintLimit: "This wallet has already publicly minted, or the 10,000 supply cap was reached.",
     MintClosed: "Public minting is closed. The owner may provide a demo NFT.",
@@ -164,7 +164,7 @@ async function readToken() {
     contracts.TrainBook.bookings(token, day, at), contracts.MatchBook.matchesPlayed(calendar.week, token, at),
   ]);
   $("stamina").textContent = stamina.toString();
-  $("token-owner").textContent = `NFT #${token} · ${short(owner)} · band ${stamina / 2000n}`;
+  $("token-owner").textContent = `NFT #${token} · ${short(owner)} · band ${(stamina >= 10_000n ? 9999n : stamina) / 2000n}`;
   const walletCount = account ? await contracts.MatchBook.walletMatchesPlayed(calendar.week, account, at) : null;
   $("quota").textContent = `Week ${calendar.week}: NFT ${count}/5 accepted races${walletCount !== null ? ` · wallet ${walletCount}/5` : ""}. Rematch cooldown: one day.`;
   let text;
@@ -199,7 +199,7 @@ async function readBoard() {
   const [top, finalized, trains, races] = await Promise.all([
     board.leaders(week, at), board.finalized(week, at), board.pendingTrains(week, at), board.pendingMatches(week, at),
   ]);
-  $("board-status").textContent = `Week ${week} · ${finalized ? "FINALIZED" : "OPEN / PROVISIONAL"} · ${trains} pending trains · ${races} pending races. Scores stay in their original week even when Core is late.`;
+  $("board-status").textContent = `Week ${week} · ${finalized ? "FINALIZED" : "OPEN / PROVISIONAL"} · ${trains} ${finalized ? "uncertified trains excluded from this table (they still train their NFTs)" : "pending trains"} · ${races} pending races. Scores stay in their original week even when Core is late.`;
   const records = await Promise.all(top.filter((id) => id !== 0n).map(async (id, index) => {
     const [entry, score, claimed] = await Promise.all([board.entries(week, id, at), board.score(week, id, at), board.prizeClaimed(week, id, at)]);
     return [index + 1, `#${id}`, entry.trainWork, entry.raceDistance, score,

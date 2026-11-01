@@ -43,10 +43,11 @@ The factory only deploys bytecode. The named owner's wallet performs these nonpa
 2. `PointsLedger.configureWriters(MatchBook, SeasonBoard)`.
 3. `SeasonBoard.configureBooks(TrainBook, MatchBook)`.
 4. Read back all links, verify the application's sources/runtime and Core pin, then `HamsterRunNFT.setMintOpen(true)` if public minting is desired. Owner demo minting may instead supply actual participating wallets with `ownerMint(recipient, quantity)` (1–50).
+5. Optionally call `CoreReader.pinGenesis()` (permissionless, no argument) and check that `genesisTimestamp()` reads 1791847800 and `GenesisPinned` was emitted. The first booking, challenge or acceptance performs the same pin if nobody did; pinning early just removes the dependency on the live implementation before any player acts.
 
 Do not guess any receipt address. Place the confirmed values under the six Solidity names in the `contracts` object of `demo/deployment.json`, retain `chainId: 11155111`, and update its status to deployed. The contract map is also accepted by the demo's advanced deployment loader. This file is website configuration, not the launch manifest.
 
-Run `node tools/owner-actions.mjs <confirmed-deployment.json>` to generate reviewable unsigned calls for steps 1–4. It refuses absent and zero addresses, performs no signing and sends no transaction. The owner should simulate and inspect those calls against the receipt; skip configurations already completed. If ownership was transferred, the current owner must act. One-time wiring cannot be overwritten, so a wiring mistake requires redeployment.
+Run `node tools/owner-actions.mjs <confirmed-deployment.json>` to generate reviewable unsigned calls for steps 1–4 (step 5 is a plain argument-less call anyone may send). It refuses absent and zero addresses, performs no signing and sends no transaction. The owner should simulate and inspect those calls against the receipt; skip configurations already completed. If ownership was transferred, the current owner must act. One-time wiring cannot be overwritten, so a wiring mistake requires redeployment.
 
 After source changes, regenerate the committed browser ABIs with `python3 tools/export-abis.py`. Serve `demo/` through HTTPS on a static host (localhost HTTP is suitable for rehearsal). No backend, build service, CDN or secret configuration is needed.
 
@@ -56,9 +57,9 @@ After source changes, regenerate the committed browser ABIs with `python3 tools/
 2. Select an owned NFT and book `[r,r+5]` within the current genesis day, where `r > currentRound`. Record NFT ID, day and window. A second booking in the same day must revert, including after an NFT transfer.
 3. Inspect the frontier banner. Before `frontier >= r+5`, settlement must revert `UnknownRounds`; if Core is paused it must revert `CorePaused`. The booking remains unsettled and weekly pending training remains nonzero. **Do not wait on a machine job or invent data to bypass upstream lag.** The human/operator can return when certification resumes.
 4. Once certified and unpaused, settle permissionlessly. Compare recorded trainWork to the two exact cumulative-work endpoints. Confirm Stamina gain from the published formula and original-week score. A certified true-zero window produces no gain. A second settlement reverts.
-5. Challenge the second NFT in the same Stamina band. Its owner accepts before the hour/week ends. Verify both transfer locks, weekly counters and snapshotted Stamina. Save the future block hash promptly (or settle directly while available). After the 15-second minimum and target block, settle and verify both distances, the winner's +2 Stamina, 10/1 wallet points and original-week score increments of `2*distance`.
+5. Challenge the second NFT in the same Stamina band. Its owner accepts before the hour/week ends. Verify both transfer locks, weekly counters and snapshotted Stamina. Save the future block hash promptly (or settle directly while available). After the 15-second minimum and target block, settle and verify both distances, the winner's +2 Stamina, 10/1 wallet points and original-week score increments of `floor(distance/100)` (the score is `trainWork + floor(summed raceDistance / 100)`).
 6. Confirm replay prevention, the rematch cooldown, and that transferring after the race does not move wallet points. In a separate abandoned race, anyone can release locks after an unsaved hash expires; no result/points are created and accepted quota remains consumed.
-7. After the week ends, settle its remaining trains and resolve its accepted races. Finalize permissionlessly, read the top ten, and claim point tiers once. Claims pay the week-specific first-activity beneficiary even after an NFT sale. A lagging Core may leave a season unfinalizable until its certified training resolves; this is intentional.
+7. After the week ends, settle its remaining trains and resolve its accepted races. Finalize permissionlessly, read the top ten, and claim point tiers once. Claims pay the week-specific first-activity beneficiary even after an NFT sale. A lagging Core delays finalization until its certified training resolves or until two weeks after the week end, whichever comes first; a finalization after the grace reports the number of excluded bookings, and those bookings still train their NFTs when they certify. A Core implementation change after the genesis pin does not block finalization or claims.
 
 The network deployer should append confirmed addresses, deployment transaction hashes, verification links and completed owner steps to its launch receipt. This build does not claim that those actions occurred.
 
@@ -67,7 +68,7 @@ The network deployer should append confirmed addresses, deployment transaction h
 | Actor | Responsibility |
 | --- | --- |
 | Launch owner | Verify and wire the graph once, choose public mint availability, safely supply demo NFTs, handle two-step ownership handover |
-| Players / volunteer keepers | Settle certified trains, save match hashes before 256-block expiry, settle or expire races, finalize and claim tiers |
+| Players / volunteer keepers | Pin the genesis (or let the first game action do it), settle certified trains, save match hashes before 256-block expiry, settle or expire races, finalize (after the grace if Core still lags) and claim tiers |
 | Site operator | Publish only confirmed addresses, maintain local ABI files, show unknown/paused/stale states, monitor RPC and reorgs |
 | Upstream Core governance / reporter | Maintain honest certification and implementation continuity; HamsterRun has no control over their availability |
 | Network reviewer / deployer | Independent review, manifest, reproducible factory deployment, explorer verification, and confirmed address handoff |

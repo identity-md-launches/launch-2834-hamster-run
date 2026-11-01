@@ -156,6 +156,72 @@ contract CoreAndTrainingTest is GameFixture {
         wrongHash.clock();
     }
 
+    function testFirstBookingPinsGenesisAndCalendarSurvivesCoreUpgrade() public {
+        assertEq(reader.genesisTimestamp(), 0);
+        vm.expectEmit(false, false, false, true);
+        emit CoreReader.GenesisPinned(GENESIS);
+        _book(1, alice, 2);
+        assertEq(reader.genesisTimestamp(), GENESIS);
+        assertEq(reader.pinGenesis(), GENESIS); // Idempotent; no second pin.
+        core.setIdentity(address(0xBEEF), 4);
+        vm.expectRevert(CoreReader.CoreIdentityChanged.selector);
+        reader.configuration();
+        (uint64 round, uint256 day, uint256 week) = reader.clock();
+        assertEq(round, 1);
+        assertEq(day, 0);
+        assertEq(week, 0);
+        assertEq(reader.weekEnd(0), GENESIS + 1 weeks);
+        vm.warp(GENESIS + 1 days);
+        _book(1, alice, 146); // Booking, challenging and accepting keep working.
+        vm.prank(bob);
+        uint256 id = matches.challenge(2, 3);
+        vm.prank(carol);
+        matches.accept(id);
+        // Work reads still fail closed: nothing is invented for either booking.
+        core.setPoint(1, 0, 0);
+        core.setPoint(7, 1000, 0);
+        core.setFrontier(7);
+        vm.expectRevert(CoreReader.CoreIdentityChanged.selector);
+        train.settle(1, 0);
+        assertEq(board.pendingTrains(0), 2);
+        assertEq(nft.stamina(1), 0);
+    }
+
+    function testAnyoneCanPinGenesisBeforeAnyGameAction() public {
+        vm.prank(carol);
+        assertEq(reader.pinGenesis(), GENESIS);
+        core.setIdentity(alice, 3);
+        (, uint256 day,) = reader.clock();
+        assertEq(day, 0);
+        vm.expectRevert(CoreReader.CoreIdentityChanged.selector);
+        reader.windowWork(2);
+    }
+
+    function testPinnedGenesisRejectsLiveGenesisDrift() public {
+        reader.pinGenesis();
+        _certify(2, 1000);
+        core.setTiming(GENESIS + 600, 600);
+        vm.expectRevert(CoreReader.InvalidConfiguration.selector);
+        reader.windowWork(2);
+        vm.expectRevert(CoreReader.InvalidConfiguration.selector);
+        reader.configuration();
+        assertEq(reader.pinGenesis(), GENESIS); // Write-once: the drifted value is never adopted.
+        (uint64 round,,) = reader.clock(); // The calendar keeps the pinned genesis.
+        assertEq(round, 8);
+        core.setTiming(GENESIS, 600);
+        assertEq(reader.windowWork(2), 1000);
+    }
+
+    function testUnpinnedReaderCannotPinThroughChangedIdentity() public {
+        core.setIdentity(address(core), 4);
+        vm.expectRevert(CoreReader.CoreIdentityChanged.selector);
+        reader.pinGenesis();
+        vm.prank(alice);
+        vm.expectRevert(CoreReader.CoreIdentityChanged.selector);
+        train.book(1, 2);
+        assertEq(reader.genesisTimestamp(), 0);
+    }
+
     function testReaderRejectsWrongTimingAndImpossibleFrontier() public {
         core.setTiming(GENESIS, 601);
         vm.expectRevert(CoreReader.InvalidConfiguration.selector);
