@@ -48,6 +48,8 @@ contract GameHandler is Test {
     mapping(uint256 => mapping(uint256 => uint256)) public ghostTrainWork;
     mapping(uint256 => mapping(uint256 => uint256)) public ghostRaceDistance;
     mapping(uint256 => uint256) public ghostPrizePaid;
+    /// Bookings still pending when their week was grace-finalized (excluded from the board).
+    mapping(uint256 => uint256) public ghostExcluded;
     mapping(uint256 => uint256) public lastStamina;
     uint256 public maxWeek;
     uint256 public ghostSupply;
@@ -72,6 +74,8 @@ contract GameHandler is Test {
     uint256 public racesExpired;
     uint256 public seasonsFinalized;
     uint256 public prizesClaimed;
+    uint256 public graceFinalizations;
+    uint256 public lateTrainsExcluded;
 
     constructor(
         MockCore core_,
@@ -219,6 +223,27 @@ contract GameHandler is Test {
         assertTrue(ghostFinalized[week], "keeper could not finalize a closed week");
     }
 
+    /// @dev Core stalls: the grace period passes without certification, accepted races are settled
+    /// or expired, and the week is finalized with its uncertified bookings excluded (never zeroed).
+    function graceFinalize(uint256 weekSeed) external {
+        // Prefer the week of a still-pending booking, so the exclusion path is actually exercised.
+        uint256 week = _pendingTrains.length == 0
+            ? bound(weekSeed, 0, maxWeek)
+            : _pendingTrains[weekSeed % _pendingTrains.length].day / 7;
+        if (ghostFinalized[week]) return;
+        _advanceTo(uint256(genesis) + (week + 1) * 1 weeks + 2 weeks);
+        for (uint256 i; i < _raceIds.length; ++i) {
+            if (matches.races(_raceIds[i]).state != MatchBook.State.Running) continue;
+            this.settleRace(i, 1);
+            if (matches.races(_raceIds[i]).state == MatchBook.State.Running) {
+                currentBlock += 257;
+                this.expire(i);
+            }
+        }
+        this.finalize(week);
+        assertTrue(ghostFinalized[week], "grace did not let a stalled week finalize");
+    }
+
     /// @dev Claims a listed prize of a finalized week (if any) on behalf of its beneficiary.
     function keeperClaim(uint256 weekSeed, uint256 slotSeed) external {
         uint256 week = bound(weekSeed, 0, maxWeek);
@@ -348,7 +373,9 @@ contract GameHandler is Test {
             ++unknownRejected;
             return;
         }
-        assertFalse(ghostFinalized[week], "week finalized with a pending train");
+        bool late = ghostFinalized[week];
+        if (late) assertGt(ghostExcluded[week], 0, "week finalized with an unexcluded pending train");
+        bytes32 tableBefore = _table(week, pending.tokenId);
         (uint64 work, uint256 gain) = train.settle(pending.tokenId, pending.day);
         uint64 expectedWork = cumAt[end] - cumAt[start - 1];
         assertEq(work, expectedWork, "train work is not the certified physical work delta");
@@ -362,7 +389,13 @@ contract GameHandler is Test {
         assertTrue(nowSettled);
         assertEq(recorded, expectedWork);
         --ghostPendingTrains[week];
-        ghostTrainWork[week][pending.tokenId] += expectedWork;
+        if (late) {
+            // A finalized table never changes; the NFT still trained above.
+            assertEq(_table(week, pending.tokenId), tableBefore, "late train rewrote a final table");
+            ++lateTrainsExcluded;
+        } else {
+            ghostTrainWork[week][pending.tokenId] += expectedWork;
+        }
         ++trainsSettled;
         _pendingTrains[index] = _pendingTrains[_pendingTrains.length - 1];
         _pendingTrains.pop();
@@ -383,7 +416,7 @@ contract GameHandler is Test {
             expected = MatchBook.InvalidOpponent.selector;
         } else if (matches.activeMatch(first) != 0 || matches.activeMatch(second) != 0) {
             expected = MatchBook.TokenBusy.selector;
-        } else if (nft.stamina(first) / 2000 != nft.stamina(second) / 2000) {
+        } else if (_band(nft.stamina(first)) != _band(nft.stamina(second))) {
             expected = MatchBook.BandMismatch.selector;
         } else if (_overLimit(week, first, firstOwner) || _overLimit(week, second, secondOwner)) {
             expected = MatchBook.WeeklyLimit.selector;
@@ -418,7 +451,7 @@ contract GameHandler is Test {
             expected = MatchBook.TokenBusy.selector;
         } else if (week != race.week || currentTime >= race.offeredAt + 1 hours) {
             expected = MatchBook.ChallengeExpired.selector;
-        } else if (nft.stamina(race.first) / 2000 != nft.stamina(race.second) / 2000) {
+        } else if (_band(nft.stamina(race.first)) != _band(nft.stamina(race.second))) {
             expected = MatchBook.BandMismatch.selector;
         } else if (_overLimit(week, race.first, race.firstOwner) || _overLimit(week, race.second, caller)) {
             expected = MatchBook.WeeklyLimit.selector;
@@ -600,16 +633,21 @@ contract GameHandler is Test {
             board.finalize(week);
             return;
         }
+        uint256 end = uint256(genesis) + (week + 1) * 1 weeks;
         if (
-            currentTime < uint256(genesis) + (week + 1) * 1 weeks || ghostPendingTrains[week] != 0
-                || ghostPendingMatches[week] != 0
+            currentTime < end || ghostPendingMatches[week] != 0
+                || (ghostPendingTrains[week] != 0 && currentTime < end + 2 weeks)
         ) {
             vm.expectRevert(SeasonBoard.SeasonNotReady.selector);
             board.finalize(week);
             return;
         }
+        vm.expectEmit(true, false, false, true, address(board));
+        emit SeasonBoard.SeasonFinalized(week, ghostPendingTrains[week]);
         board.finalize(week);
         ghostFinalized[week] = true;
+        ghostExcluded[week] = ghostPendingTrains[week];
+        if (ghostPendingTrains[week] != 0) ++graceFinalizations;
         ++seasonsFinalized;
     }
 
@@ -659,6 +697,15 @@ contract GameHandler is Test {
     function _trackWeek() internal {
         uint256 week = (currentTime - genesis) / 1 weeks;
         if (week > maxWeek) maxWeek = week;
+    }
+
+    function _table(uint256 week, uint256 tokenId) internal view returns (bytes32) {
+        (uint256 trainWork, uint256 raceDistance, address beneficiary) = board.entries(week, tokenId);
+        return keccak256(abi.encode(board.leaders(week), trainWork, raceDistance, beneficiary));
+    }
+
+    function _band(uint256 stamina) internal pure returns (uint256) {
+        return (stamina >= 10_000 ? 9_999 : stamina) / 2000;
     }
 
     function _overLimit(uint256 week, uint256 tokenId, address account) internal view returns (bool) {

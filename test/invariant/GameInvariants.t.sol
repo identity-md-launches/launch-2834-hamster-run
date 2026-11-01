@@ -54,7 +54,7 @@ contract GameInvariantsTest is Test {
 
         handler = new GameHandler(core, reader, nft, ledger, board, train, matches, admin, actors, GENESIS);
 
-        bytes4[] memory selectors = new bytes4[](23);
+        bytes4[] memory selectors = new bytes4[](24);
         selectors[0] = GameHandler.warp.selector;
         selectors[1] = GameHandler.rollBlocks.selector;
         selectors[2] = GameHandler.advanceCore.selector;
@@ -78,6 +78,7 @@ contract GameInvariantsTest is Test {
         selectors[20] = GameHandler.keeperTrain.selector;
         selectors[21] = GameHandler.keeperFinalize.selector;
         selectors[22] = GameHandler.keeperClaim.selector;
+        selectors[23] = GameHandler.graceFinalize.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }
@@ -161,7 +162,10 @@ contract GameInvariantsTest is Test {
             assertEq(board.pendingMatches(week), handler.ghostPendingMatches(week), "pending matches");
             assertEq(board.finalized(week), handler.ghostFinalized(week), "finalization reopened or skipped");
             if (board.finalized(week)) {
-                assertEq(board.pendingTrains(week), 0, "finalized with pending training");
+                // Only bookings excluded by a grace finalization may still be pending afterwards.
+                assertLe(
+                    board.pendingTrains(week), handler.ghostExcluded(week), "finalized with pending training"
+                );
                 assertEq(board.pendingMatches(week), 0, "finalized with pending races");
             }
             assertLe(handler.ghostPrizePaid(week), 300 + 2 * 150 + 7 * 50, "prize budget exceeded");
@@ -179,7 +183,7 @@ contract GameInvariantsTest is Test {
                 (uint256 trainWork, uint256 raceDistance,) = board.entries(week, t);
                 assertEq(trainWork, handler.ghostTrainWork(week, t), "trainWork != certified work");
                 assertEq(raceDistance, handler.ghostRaceDistance(week, t), "raceDistance");
-                assertEq(board.score(week, t), trainWork + 2 * raceDistance, "published k");
+                assertEq(board.score(week, t), trainWork + raceDistance / 100, "published k");
             }
             uint256[10] memory top = board.leaders(week);
             // Expected list: every token with a positive score, ordered by score desc then ID asc.
@@ -242,12 +246,19 @@ contract GameInvariantsTest is Test {
         handler.keeperFinalize(0, 11);
         handler.keeperClaim(0, 0);
         handler.keeperClaim(0, 0); // already claimed: NoPrize
+        // A later week whose booking the Core never certifies: grace finalization excludes it,
+        // and certifying it afterwards still trains the NFT without touching the closed table.
+        handler.book(5, 0);
+        handler.graceFinalize(type(uint256).max);
+        handler.keeperTrain(0, 13);
         assertGt(handler.trainsSettled(), 0);
         assertGt(handler.unknownRejected(), 0);
         assertGt(handler.pausedRejected(), 0);
         assertGt(handler.racesSettled(), 0);
         assertGt(handler.racesExpired(), 0);
-        assertEq(handler.seasonsFinalized(), 1);
+        assertEq(handler.seasonsFinalized(), 2);
+        assertEq(handler.graceFinalizations(), 1);
+        assertEq(handler.lateTrainsExcluded(), 1);
         assertEq(handler.prizesClaimed(), 1);
         invariant_pointsLedgerMatchesModelAndSums();
         invariant_matchLocksMatchActiveRaces();
@@ -272,5 +283,8 @@ contract GameInvariantsTest is Test {
             handler.racesExpired()
         );
         console.log("finalized/prizes", handler.seasonsFinalized(), handler.prizesClaimed());
+        console.log(
+            "grace finalized/late excluded", handler.graceFinalizations(), handler.lateTrainsExcluded()
+        );
     }
 }
