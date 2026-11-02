@@ -3,3 +3,19 @@ cache/
 broadcast/
 test/scratch/
 __pycache__/
+
+# Explicit delivery budget: this ignore file <= 2 KiB.
+# Retained reports <= 72 KiB combined; six screenshots <= 512 KiB combined.
+# Include only these bounded deliverables despite any broader global exclusion.
+!/artifacts/
+!/artifacts/validation.md
+!/artifacts/check-results.json
+!/artifacts/chain-preflight.json
+!/artifacts/bundle.md
+!/artifacts/screenshots/
+!/artifacts/screenshots/play-390.png
+!/artifacts/screenshots/play-1440.png
+!/artifacts/screenshots/invite-390.png
+!/artifacts/screenshots/invite-board-empty.png
+!/artifacts/screenshots/wallet-keyboard-fixture.png
+!/artifacts/screenshots/wallet-phone.png

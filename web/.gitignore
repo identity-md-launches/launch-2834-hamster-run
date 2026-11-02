@@ -1,0 +1,7 @@
+# Path budget: this file < 1 KiB; generated dependencies and service data: 0 submitted bytes.
+node_modules/
+.vite/
+.cache/
+coverage/
+service/data/
+*.tsbuildinfo

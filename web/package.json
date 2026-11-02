@@ -1,0 +1,31 @@
+{
+  "name": "hamsterrun-sepolia",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "service": "node service/server.mjs",
+    "check:abis": "node scripts/check-abis.mjs",
+    "test:service": "node --test service/service.test.mjs"
+  },
+  "dependencies": {
+    "@coinbase/wallet-sdk": "^4.3.6",
+    "@tanstack/react-query": "5.105.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "viem": "2.57.14",
+    "wagmi": "3.7.9"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "typescript": "^5.9.3",
+    "vite": "8.3.5"
+  }
+}

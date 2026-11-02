@@ -1,0 +1,379 @@
+{
+  "date": "2026-11-02",
+  "scope": "Worker-local validation; not independent certification.",
+  "build": {
+    "command": "npm run build --prefix web",
+    "exitCode": 0
+  },
+  "typecheck": {
+    "command": "npm run typecheck --prefix web",
+    "exitCode": 0
+  },
+  "abis": {
+    "command": "npm run check:abis --prefix web",
+    "matched": 6,
+    "total": 6,
+    "exitCode": 0
+  },
+  "inviteServiceTests": {
+    "command": "npm run test:service --prefix web",
+    "passed": 6,
+    "failed": 0,
+    "exitCode": 0
+  },
+  "browser": {
+    "checks": [
+      {
+        "name": "390px first screen contains product and primary mint action",
+        "passed": true
+      },
+      {
+        "name": "EIP-6963 discovery hides generic row; Escape closes and restores focus",
+        "passed": true
+      },
+      {
+        "name": "Wrong network disables writes and wallet control switches to Sepolia",
+        "passed": true
+      },
+      {
+        "name": "Wallet rejection has a retry and sends no transaction",
+        "passed": true
+      },
+      {
+        "name": "MintClosed and MintLimit contract errors are clear before sending",
+        "passed": true
+      },
+      {
+        "name": "Free public mint confirms, ownership and Stamina load, lifetime mint disables",
+        "passed": true
+      },
+      {
+        "name": "Successful mint with ?ref attributes once through a signed backend request",
+        "passed": true
+      },
+      {
+        "name": "Open mint works before game wiring; training waits for completed wiring",
+        "passed": true
+      },
+      {
+        "name": "Future 6-round window books; uncertified round work remains Unknown",
+        "passed": true
+      },
+      {
+        "name": "Paused Core banner persists and training settlement disables",
+        "passed": true
+      },
+      {
+        "name": "Training settles only after frontier covers all six rounds",
+        "passed": true
+      },
+      {
+        "name": "1v1 challenge, opposing-wallet acceptance, future-block guard, seed capture and settlement",
+        "passed": true
+      },
+      {
+        "name": "Weekly board uses 123 + floor(19999/100) = 322",
+        "passed": true
+      },
+      {
+        "name": "Invite board shows the verified mint count separately from SeasonBoard",
+        "passed": true
+      },
+      {
+        "name": "X handle validation, normalization, wallet signature, persistent registration and subpath share URL",
+        "passed": true
+      },
+      {
+        "name": "mintOpen=false shows closed/owner-wiring message and disabled CTA",
+        "passed": true
+      },
+      {
+        "name": "Read failure makes Core unknown and disables writes instead of inventing zeros",
+        "passed": true
+      },
+      {
+        "name": "No page overflow at 320, 390, 760, 1080 and 1440; relative assets work under /preview/",
+        "passed": true
+      },
+      {
+        "name": "Footer home navigation returns to the game at the top of the page",
+        "passed": true
+      },
+      {
+        "name": "No uncaught script errors or missing local resources across primary interactions",
+        "passed": true
+      },
+      {
+        "name": "Phone sheet has all four Open in links and Coinbase Smart Wallet",
+        "passed": true
+      },
+      {
+        "name": "Phone EIP-6963 provider remains connectable without window.ethereum",
+        "passed": true
+      }
+    ],
+    "live": "\u25f7\nCore is catching up\n\nCertified through 1,973 \u00b7 current round 2,911 \u00b7 937 closed rounds unknown\n\nWhat this means\n\u21bb\nMeet your first HAM.\nFree mint\n\nOne little buddy per wallet. Train together. Race your friends.\n\nHamsters minted\n0 / 10,000\nMint closed\n\u25a6\n\nMint closed / owner wiring pending\n\nmintOpen\nfalse\nTestnet only",
+    "axe": [
+      {
+        "view": "invites",
+        "violations": []
+      },
+      {
+        "view": "play",
+        "violations": []
+      }
+    ],
+    "limitations": [
+      "WebKit could not launch: missing host libraries. Chromium phone emulation is not a physical iPhone test."
+    ],
+    "liveDetails": "What this meansTraining only settles when the full six-round window is certified. Uncertified work is never counted as zero. Snapshot: Sepolia block 12045802.",
+    "liveErrors": []
+  },
+  "tasteOnline": [
+    {
+      "name": "render",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 12823,
+      "output": "renders, no script errors or missing local files\nexternal hosts: ethereum-sepolia-rpc.publicnode.com"
+    },
+    {
+      "name": "layout",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no horizontal scroll at 320, 390 or 1440\nno text box overlaps another\nno floating control covers text\nno text cut off by overflow: hidden"
+    },
+    {
+      "name": "targets",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all 19 controls at least 24px or spaced at 390\n6 under the 44px comfortable size"
+    },
+    {
+      "name": "contrast",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all measured text meets 4.5:1 (3:1 large)\n2 text boxes over images, video, canvas or gradients not measured"
+    },
+    {
+      "name": "casing",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no all-caps text in content"
+    },
+    {
+      "name": "tracking",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "letter-spacing natural in content (display type may run tight)"
+    },
+    {
+      "name": "eyebrows",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no kicker labels above headings"
+    },
+    {
+      "name": "type-sizes",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "390: 4 sizes in use, 5 with one-offs (13px\u00d745, 16px\u00d78, 20px\u00d72, 24px\u00d76, 32px\u00d71)\n1440: 4 sizes in use, 6 with one-offs (13px\u00d735, 16px\u00d717, 20px\u00d75, 24px\u00d75, 28px\u00d71, 48px\u00d71)\nbar: 6 sizes used more than once, 8 counting one-offs, per width"
+    },
+    {
+      "name": "type-faces",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "families (2): pixelify, nunito\nweights (2): 400, 700"
+    },
+    {
+      "name": "glyphs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no em dashes or emoji in text"
+    },
+    {
+      "name": "slogans",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "3 two-beat lines; a stack is four or more, so keep the best and cut the rest:\n\"Small paws. Big adventures.\" (#main > div.page-heading:nth-of-type(1) > div > h1)\n\"A tiny world. A fresh start.\" (#main > section.welcome:nth-of-type(1) > div.meadow:nth-of-type(1))\n\"Meet your first HAM. Free mint\" (#main > section.welcome:nth-of-type(1) > div.mint-panel:nth-of-type(2) > div.section-heading:nth-of-type(1))"
+    },
+    {
+      "name": "repetition",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 2,
+      "output": "no repeated lines"
+    },
+    {
+      "name": "copy-budget",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "prose on the first screen: 34 words at 390 (bar 60), 51 at 1440 (bar 90)\nall words on the first screen: 70 at 390, 103 at 1440\nwhole page: 325 words, 177 of them prose"
+    },
+    {
+      "name": "chrome",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "border and shadow together: 0\ncards inside cards: 0\ngradient text: 0"
+    },
+    {
+      "name": "motion",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "transition: all on 0 elements\nendless animations: 0; still running with reduced motion: 0"
+    },
+    {
+      "name": "share",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "title \"HamsterRun \u00b7 Small paws, big adventures\", favicon, og:title, og:image, description"
+    }
+  ],
+  "tasteOffline": [
+    {
+      "name": "render",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 8550,
+      "output": "renders, no script errors or missing local files\nexternal hosts: ethereum-sepolia-rpc.publicnode.com, rpc.sepolia.ethpandaops.io, sepolia.rpc.sentio.xyz"
+    },
+    {
+      "name": "layout",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no horizontal scroll at 320, 390 or 1440\nno text box overlaps another\nno floating control covers text\nno text cut off by overflow: hidden"
+    },
+    {
+      "name": "targets",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all 19 controls at least 24px or spaced at 390\n6 under the 44px comfortable size"
+    },
+    {
+      "name": "contrast",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "all measured text meets 4.5:1 (3:1 large)\n2 text boxes over images, video, canvas or gradients not measured"
+    },
+    {
+      "name": "casing",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "no all-caps text in content"
+    },
+    {
+      "name": "tracking",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "letter-spacing natural in content (display type may run tight)"
+    },
+    {
+      "name": "eyebrows",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no kicker labels above headings"
+    },
+    {
+      "name": "type-sizes",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "390: 4 sizes in use, 5 with one-offs (13px\u00d745, 16px\u00d77, 20px\u00d72, 24px\u00d76, 32px\u00d71)\n1440: 4 sizes in use, 6 with one-offs (13px\u00d735, 16px\u00d716, 20px\u00d75, 24px\u00d75, 28px\u00d71, 48px\u00d71)\nbar: 6 sizes used more than once, 8 counting one-offs, per width"
+    },
+    {
+      "name": "type-faces",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "families (2): pixelify, nunito\nweights (2): 400, 700"
+    },
+    {
+      "name": "glyphs",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no em dashes or emoji in text"
+    },
+    {
+      "name": "slogans",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "3 two-beat lines; a stack is four or more, so keep the best and cut the rest:\n\"Small paws. Big adventures.\" (#main > div.page-heading:nth-of-type(1) > div > h1)\n\"A tiny world. A fresh start.\" (#main > section.welcome:nth-of-type(1) > div.meadow:nth-of-type(1))\n\"Meet your first HAM. Free mint\" (#main > section.welcome:nth-of-type(1) > div.mint-panel:nth-of-type(2) > div.section-heading:nth-of-type(1))"
+    },
+    {
+      "name": "repetition",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "no repeated lines"
+    },
+    {
+      "name": "copy-budget",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "prose on the first screen: 30 words at 390 (bar 60), 47 at 1440 (bar 90)\nall words on the first screen: 65 at 390, 98 at 1440\nwhole page: 310 words, 163 of them prose"
+    },
+    {
+      "name": "chrome",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "border and shadow together: 0\ncards inside cards: 0\ngradient text: 0"
+    },
+    {
+      "name": "motion",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 0,
+      "output": "transition: all on 0 elements\nendless animations: 0; still running with reduced motion: 0"
+    },
+    {
+      "name": "share",
+      "passed": true,
+      "exitCode": 0,
+      "durationMs": 1,
+      "output": "title \"HamsterRun \u00b7 Small paws, big adventures\", favicon, og:title, og:image, description"
+    }
+  ],
+  "localServiceInspection": {
+    "health": {
+      "ok": true,
+      "chainId": 11155111,
+      "storage": "sqlite"
+    },
+    "unseededLeaderboard": [],
+    "inviteActionBottomAt390": 783.375,
+    "viewportHeight": 844,
+    "localFontsLoaded": true,
+    "pageErrors": []
+  },
+  "limitations": [
+    "No worker-signed live transactions.",
+    "Public mint is owner-closed and game wiring incomplete at the observed block.",
+    "Shared production invites require operating/configuring the included service.",
+    "WebKit could not launch due to missing host libraries; no physical wallet, passkey session, screen-reader or native zoom test.",
+    "Finalization/prize and expired-race release controls were source-reviewed, not individually browser-exercised."
+  ]
+}
