@@ -8,16 +8,18 @@ import {
   type Address,
   type Hex,
 } from "viem";
-import deployment from "./deployment.json";
+import { deployment } from "./deployment-runtime";
 import contractAbis from "./abis.json";
 
 export const chain = defineChain({
   id: deployment.chainId,
-  name: "Sepolia",
-  testnet: true,
-  nativeCurrency: { name: "Sepolia Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: deployment.rpcUrls } },
-  blockExplorers: { default: { name: "Etherscan", url: deployment.explorer } },
+  name: deployment.network.name,
+  testnet: deployment.network.testnet,
+  nativeCurrency: deployment.network.nativeCurrency,
+  rpcUrls: { default: { http: deployment.network.rpcUrls } },
+  blockExplorers: {
+    default: { name: "Etherscan", url: deployment.network.explorer },
+  },
 });
 const transport = () =>
   fallback(
@@ -73,13 +75,19 @@ export type Core = {
 export type Snapshot = {
   core: Core | null;
   coreError: string;
-  supply: bigint;
-  mintOpen: boolean;
+  genesisPinned: bigint | null;
+  supply: bigint | null;
+  mintOpen: boolean | null;
+  mintError: string;
   wired: boolean;
+  wiringError: string;
   block: bigint;
+  timestamp: bigint;
   checkedAt: number;
 };
 export type Pet = { id: bigint; stamina: bigint; locked: boolean };
+export type Rival = Pet & { owner: Address };
+export type MatchEntry = { id: bigint; race: Race };
 export type WalletData = { pets: Pet[]; points: bigint; publicMinted: boolean };
 export type Booking = {
   day: bigint;
@@ -135,33 +143,51 @@ export async function snapshot(): Promise<Snapshot> {
       );
     codeVerified = true;
   }
-  const [
-    supply,
-    mintOpen,
-    train,
-    match,
-    ledgerMatch,
-    ledgerBoard,
-    boardTrain,
-    boardMatch,
-  ] = await Promise.all([
+  // Mint, game wiring and Core are independent reads. A failed subsystem must
+  // never turn successfully read mint values into "unknown".
+  const mint = await Promise.allSettled([
     read<bigint>("HamsterRunNFT", "totalSupply", [], block.number),
     read<boolean>("HamsterRunNFT", "mintOpen", [], block.number),
-    read<Address>("HamsterRunNFT", "trainBook", [], block.number),
-    read<Address>("HamsterRunNFT", "matchBook", [], block.number),
-    read<Address>("PointsLedger", "matchBook", [], block.number),
-    read<Address>("PointsLedger", "seasonBoard", [], block.number),
-    read<Address>("SeasonBoard", "trainBook", [], block.number),
-    read<Address>("SeasonBoard", "matchBook", [], block.number),
   ]);
-  const equal = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-  const wired =
-    equal(train, addresses.TrainBook) &&
-    equal(match, addresses.MatchBook) &&
-    equal(ledgerMatch, addresses.MatchBook) &&
-    equal(ledgerBoard, addresses.SeasonBoard) &&
-    equal(boardTrain, addresses.TrainBook) &&
-    equal(boardMatch, addresses.MatchBook);
+  const supply = mint[0].status === "fulfilled" ? mint[0].value : null;
+  const mintOpen = mint[1].status === "fulfilled" ? mint[1].value : null;
+  const mintError = mint.some((r) => r.status === "rejected")
+    ? "Mint reads failed. Refresh to check availability."
+    : "";
+  let wired = false,
+    wiringError = "";
+  try {
+    const [train, match, ledgerMatch, ledgerBoard, boardTrain, boardMatch] =
+      await Promise.all([
+        read<Address>("HamsterRunNFT", "trainBook", [], block.number),
+        read<Address>("HamsterRunNFT", "matchBook", [], block.number),
+        read<Address>("PointsLedger", "matchBook", [], block.number),
+        read<Address>("PointsLedger", "seasonBoard", [], block.number),
+        read<Address>("SeasonBoard", "trainBook", [], block.number),
+        read<Address>("SeasonBoard", "matchBook", [], block.number),
+      ]);
+    const equal = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+    wired =
+      equal(train, addresses.TrainBook) &&
+      equal(match, addresses.MatchBook) &&
+      equal(ledgerMatch, addresses.MatchBook) &&
+      equal(ledgerBoard, addresses.SeasonBoard) &&
+      equal(boardTrain, addresses.TrainBook) &&
+      equal(boardMatch, addresses.MatchBook);
+  } catch {
+    wiringError = "Game wiring could not be checked. Refresh before playing.";
+  }
+  let genesisPinned: bigint | null = null;
+  try {
+    genesisPinned = await read<bigint>(
+      "CoreReader",
+      "genesisTimestamp",
+      [],
+      block.number,
+    );
+  } catch {
+    /* The pin CTA stays unavailable when its state is unknown. */
+  }
   let core: Core | null = null,
     coreError = "";
   try {
@@ -205,10 +231,14 @@ export async function snapshot(): Promise<Snapshot> {
   return {
     core,
     coreError,
+    genesisPinned,
     supply,
     mintOpen,
+    mintError,
     wired,
+    wiringError,
     block: block.number,
+    timestamp: block.timestamp,
     checkedAt: Date.now(),
   };
 }
@@ -263,6 +293,83 @@ export async function walletData(
   );
   return { pets, points, publicMinted };
 }
+/** Scan a bounded ID page at one block; no fabricated or cached ownership. */
+export async function rivalsPage(
+  selected: Pet,
+  owner: Address,
+  supply: bigint,
+  block: bigint,
+  start = 1n,
+) {
+  const through = start + 79n < supply ? start + 79n : supply;
+  const ids = Array.from(
+    { length: Math.max(0, Number(through - start + 1n)) },
+    (_, i) => start + BigInt(i),
+  );
+  const rivals: Rival[] = [];
+  // Bound concurrent RPC work. A failed page is an error, never an empty list.
+  for (let i = 0; i < ids.length; i += 20) {
+    const rows = await Promise.all(
+      ids.slice(i, i + 20).map(async (id) => {
+        if (id === selected.id) return null;
+        const other = await read<Address>(
+          "HamsterRunNFT",
+          "ownerOf",
+          [id],
+          block,
+        );
+        if (other.toLowerCase() === owner.toLowerCase()) return null;
+        const [stamina, locked] = await Promise.all([
+          read<bigint>("HamsterRunNFT", "stamina", [id], block),
+          read<boolean>("HamsterRunNFT", "matchLocked", [id], block),
+        ]);
+        const band = (s: bigint) => (s < 10000n ? s : 9999n) / 2000n;
+        return !locked && band(stamina) === band(selected.stamina)
+          ? { id, owner: other, stamina, locked }
+          : null;
+      }),
+    );
+    for (const row of rows) if (row) rivals.push(row);
+  }
+  return { rivals, through, next: through < supply ? through + 1n : undefined };
+}
+
+/** Newest-first scan of authoritative race structs, including both wallet roles. */
+export async function inboxPage(
+  owner: Address,
+  block: bigint,
+  before: bigint | null,
+) {
+  const end =
+    before ?? (await read<bigint>("MatchBook", "nextMatchId", [], block));
+  const start = end > 60n ? end - 60n : 1n;
+  const matches: MatchEntry[] = [];
+  for (let cursor = end - 1n; cursor >= start; cursor -= 20n) {
+    const ids = Array.from(
+      { length: Number(cursor - start + 1n < 20n ? cursor - start + 1n : 20n) },
+      (_, i) => cursor - BigInt(i),
+    );
+    const races = await Promise.all(
+      ids.map((id) => read<Race>("MatchBook", "races", [id], block)),
+    );
+    races.forEach((race, i) => {
+      if (
+        race.state === 1 &&
+        [race.firstOwner, race.secondOwner].some(
+          (a) => a.toLowerCase() === owner.toLowerCase(),
+        )
+      )
+        matches.push({ id: ids[i], race });
+    });
+  }
+  return {
+    matches,
+    next: start > 1n ? start : undefined,
+    through: start,
+    total: end - 1n,
+  };
+}
+
 export async function booking(
   id: bigint,
   day: bigint,
@@ -303,7 +410,7 @@ export async function board(week: bigint, block?: bigint): Promise<Board> {
 export function readableError(error: unknown): string {
   const names: Record<string, string> = {
     MintClosed:
-      "Mint closed / owner wiring pending. Try again after the owner opens minting.",
+      "Mint is closed. Try again after the collection owner opens minting.",
     MintLimit:
       "This wallet has already minted, or all 10,000 HAMs have been minted.",
     UnknownRounds:

@@ -1572,3 +1572,184 @@ td:last-child {
     outline: 2px solid Highlight;
   }
 }
+
+/* Match discovery uses the existing palette, type scale and normal-flow panels. */
+.game-grid {
+  align-items: start;
+}
+.game-jump {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  margin-block-start: 8px;
+}
+.pin-action {
+  margin-block-start: 10px;
+}
+.pin-action .button {
+  margin-block-start: 8px;
+}
+.rival-discovery,
+.match-inbox {
+  margin-block-start: 24px;
+}
+.rival-discovery > p,
+.match-inbox > p {
+  margin-block-start: 8px;
+}
+.rival-list,
+.offer-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+}
+.rival-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-block: 16px;
+  border-block-end: 1px solid var(--line);
+}
+.rival-list li > div {
+  flex: 1;
+  min-width: 0;
+}
+.rival-list img {
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+.rival-list .button {
+  flex-shrink: 0;
+}
+.offer-list li {
+  padding-block: 16px;
+  border-block-end: 1px solid var(--line);
+}
+.offer-list li > p {
+  margin-block-start: 4px;
+}
+.offer-list .button-row {
+  margin-block-start: 12px;
+}
+.offer-link {
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  overflow-wrap: anywhere;
+}
+.manual-challenge {
+  margin-block-start: 20px;
+}
+.manual-challenge summary {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  min-height: 44px;
+  padding-block: 10px;
+}
+.manual-challenge form {
+  margin-block-start: 8px;
+}
+.match-inbox,
+.match-lookup {
+  padding-block-start: 24px;
+  border-block-start: 1px solid var(--line);
+}
+.share-match {
+  margin-block-start: 20px;
+}
+.share-match input {
+  font-size: var(--text-base);
+}
+.race-outline {
+  padding-inline-start: 20px;
+  margin-block: 20px 0;
+  color: var(--muted);
+}
+.race-outline li + li {
+  margin-block-start: 6px;
+}
+.race-stepper {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-block: 20px;
+  padding: 0;
+}
+.race-stepper li {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+}
+.race-stepper li > span {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.race-stepper li.done,
+.race-stepper li[aria-current] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.race-stepper .done > span {
+  background: var(--green-200);
+}
+.race-stepper [aria-current] > span {
+  background: var(--accent);
+}
+.race-status p {
+  margin-block-start: 12px;
+}
+.race-status > .button-row {
+  margin-block: 16px;
+  margin-inline: 0;
+}
+.startup-error {
+  padding-block: 48px;
+}
+.startup-error .button {
+  margin-block-start: 24px;
+}
+@media (max-width: 760px) {
+  .meadow {
+    aspect-ratio: 3;
+  }
+  .rival-list {
+    margin-block: 8px;
+  }
+  .rival-list li {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .rival-list img {
+    width: 32px;
+    height: 32px;
+  }
+  .rival-list .button {
+    padding-inline: 10px;
+  }
+  .race-status > .button-row > .button {
+    flex: 1;
+  }
+}
+
+/* Full uint256 match IDs stay readable at the narrowest supported width. */
+.race-panel {
+  overflow-wrap: anywhere;
+}
+.race-status h3 {
+  line-height: 1.4;
+}

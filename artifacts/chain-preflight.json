@@ -1,52 +1,29 @@
 {
-  "checkedAt": "2026-11-02T04:12:44.576Z",
   "chainId": 11155111,
-  "block": "12045706",
-  "mintOpen": false,
-  "totalSupply": "0",
-  "maxSupply": "10000",
-  "core": {
-    "currentRound": "2909",
-    "frontier": "1973",
-    "paused": false,
-    "closedRoundsUnknown": "935",
-    "pinVerified": true,
-    "day": "20",
-    "week": "2"
+  "publicRpc": "https://ethereum-sepolia-rpc.publicnode.com",
+  "block": "12046119",
+  "timestamp": "1793597712",
+  "supply": "1",
+  "mintOpen": true,
+  "genesisTimestamp": "1791847800",
+  "current": "2917",
+  "frontier": "1973",
+  "paused": false,
+  "lag": "943",
+  "allSixContractsHaveCode": true,
+  "errors": [],
+  "missing": [],
+  "fonts": {
+    "nunito": true,
+    "pixelify": true
   },
-  "raceUnitsPerScore": "100",
-  "wiringComplete": false,
-  "deployedCode": [
-    {
-      "name": "CoreReader",
-      "address": "0xfcb36c0c30b168c03984a38a84c71295e48e8cb6",
-      "runtimeHash": "0xd957f1ddb6ccc42a56f491b36319c2f614b63db573d3419b97bf48efd9fb3088"
-    },
-    {
-      "name": "HamsterRunNFT",
-      "address": "0x15fd3a510a22b840ccc4c09900ae50d85c9bb02c",
-      "runtimeHash": "0x04fb22c2f9e52fb63d79d5fbecf25944f01a177897ce1ddeba2150326424cd79"
-    },
-    {
-      "name": "PointsLedger",
-      "address": "0x5e64699ba7674b32ffe29d2eefc026fd24ae0833",
-      "runtimeHash": "0x1f5a8e766864d9add09481ef1596cb0b3346e89b2d1d089fb65766421a9084a8"
-    },
-    {
-      "name": "SeasonBoard",
-      "address": "0xb610f45f40ea0032d687e1d2a6f22c0bcad3827f",
-      "runtimeHash": "0x7684798481111b95cae7014a91cb74a45ecb3dfd47c3bdac7551e5926a03c637"
-    },
-    {
-      "name": "TrainBook",
-      "address": "0x4af10452d22e2323fc6b0417448f6102509bde9a",
-      "runtimeHash": "0xaab2e29cb94f012441600acb2f07043ab1b77162f324bcfe028e2b91a68370a8"
-    },
-    {
-      "name": "MatchBook",
-      "address": "0x8f8f34bad21fd8b5eaa61b1f49512422c737986a",
-      "runtimeHash": "0xad1e714f2cc20ce59d30fde83a466a63716d11f7529dad127eba551b2c5f7aca"
-    }
+  "screenshots": [
+    "play-390.png",
+    "play-1440.png"
   ],
-  "note": "Read-only observation, not a transaction or independent contract audit."
+  "limitations": [
+    "Read-only public RPC observation; no live transaction, wallet signature or invite backend deployment."
+  ],
+  "coreBanner": "◷\nCore is catching up\n\nCertified through 1,973 · current round 2,917 · 943 closed rounds unknown\n\nWhat this means\n↻",
+  "mintPanel": "Meet your first HAM.\nFree mint\n\nOne little buddy per wallet. Train together. Race your friends.\n\nHamsters minted\n1 / 10,000\nMint a hamster\n→\n\n0 ETH mint price · Sepolia gas only\n\nMint status\nOpen\nTestnet only"
 }

@@ -7,14 +7,20 @@ import { readableError } from "./chain";
 
 let configuredUrl: Promise<string> | undefined;
 export function serviceUrl(): Promise<string> {
-  return (configuredUrl ??= fetch("./site-config.json")
+  return (configuredUrl ??= fetch("./site-config.json", {
+    signal: AbortSignal.timeout(8_000),
+  })
     .then(async (r) => {
       if (!r.ok)
         throw new Error(
           "Invite configuration is unavailable. Reload to retry.",
         );
       const c = (await r.json()) as { inviteServiceUrl?: string };
-      const url = new URL(c.inviteServiceUrl || "./api", location.href);
+      if (!c.inviteServiceUrl?.trim())
+        throw new Error(
+          "Invite service offline. A public HTTPS service has not been configured.",
+        );
+      const url = new URL(c.inviteServiceUrl);
       if (
         url.protocol !== "https:" &&
         !(
@@ -37,7 +43,9 @@ export async function inviteApi<T>(path: string, body?: object): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(12_000),
   });
-  const data = (await response.json().catch(() => ({}))) as T & {
+  const data = (await response.json().catch(() => {
+    throw new Error("Invite service offline. Its response was not valid JSON.");
+  })) as T & {
     error?: string;
   };
   if (!response.ok)
@@ -161,7 +169,11 @@ export function InvitePanel({
   const actions = useInviteActions();
   const health = useQuery({
     queryKey: ["invite-health"],
-    queryFn: () => inviteApi<{ ok: boolean }>("/health"),
+    queryFn: async () => {
+      const health = await inviteApi<{ ok: boolean }>("/health");
+      if (health.ok !== true) throw new Error("Invite service offline.");
+      return health;
+    },
     retry: false,
     staleTime: 30_000,
   });
@@ -368,12 +380,29 @@ export function InvitePanel({
 export function InviteLeaderboard() {
   const q = useQuery({
     queryKey: ["invite-board"],
-    queryFn: () =>
-      inviteApi<{ entries: { handle: string; count: number }[] }>(
-        "/leaderboard",
-      ),
+    queryFn: async () => {
+      const board = await inviteApi<{
+        entries: { handle: string; count: number }[];
+      }>("/leaderboard");
+      if (
+        !Array.isArray(board.entries) ||
+        board.entries.some(
+          (e) =>
+            !e ||
+            typeof e.handle !== "string" ||
+            !/^[a-z0-9_]{1,15}$/.test(e.handle) ||
+            !Number.isSafeInteger(e.count) ||
+            e.count < 0,
+        )
+      )
+        throw new Error(
+          "Invite service returned an invalid board. Retry when it is online.",
+        );
+      return board;
+    },
     retry: false,
-    refetchInterval: 30_000,
+    refetchInterval: (query) =>
+      query.state.status === "error" ? false : 30_000,
   });
   return (
     <div className="panel">

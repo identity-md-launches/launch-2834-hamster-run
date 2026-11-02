@@ -1,18 +1,18 @@
 # Submission byte and path budget
 
-The conservative audit counts the complete size of every new or modified file, including the full modified README and both ignore files. Unchanged baseline files and disposable scratch checks are excluded. Git packing overhead is not estimated; the margin below is intentionally large.
+Conservative full size of every added/modified file, including required production bundles, source, documents, reports and six screenshots. Deletions and unchanged baseline files are excluded. No Git staging/commit operation was performed by the worker; these are the prepared files for the network submission.
 
-| Path group | Explicit budget | Measured bytes |
-| --- | ---: | ---: |
-| `web/` | 2,097,152 | 443,157 |
-| `dist/` | 2,097,152 | 930,762 |
-| `artifacts/` | 1,048,576 | 334,553 |
-| `root docs and ignore` | 262,144 | 34,287 |
+| Path group | Measured added/modified bytes |
+| --- | ---: |
+| `web/` | 190,620 |
+| `dist/` | 820,488 |
+| `artifacts/` | 339,373 |
+| `root documentation` | 37,332 |
 
-**Total: 1,742,759 bytes (1.662 MiB), across 73 files.** Assignment limit: **8,388,608 bytes**. Remaining headroom: **6,645,849 bytes**.
+**Total: 1,387,813 bytes (1.324 MiB), across 34 files.** Limit: **8,388,608 bytes**; headroom: **7,000,795 bytes**.
 
-The required source, frontend manifest and lockfile, complete runtime assets, static export, design documentation and validation evidence remain present. No runtime asset was removed to reduce the payload.
+The complete runtime source/assets/export and existing tracked frontend manifest/lockfile are retained. The final export exactly matches the last successful production build; runtime network bytes and addresses/ABI hashes match the pinned inputs.
 
-`web/.gitignore` is budgeted below 1 KiB and excludes generated `node_modules/`, `.vite/`, `.cache/`, `coverage/`, `service/data/` and `*.tsbuildinfo` at its scope: zero submitted bytes. The root `.gitignore` is budgeted below 2 KiB and only adds explicit exceptions for four reports (72 KiB combined budget) and six PNG screenshots (512 KiB combined budget). Those exceptions retain the requested evidence despite a broader inherited artifact exclusion. Existing ignore entries are preserved.
+Existing ignore files are unchanged. Their existing budgets remain satisfied: six screenshots total 310,236 bytes (under 512 KiB); four retained reports total 29,137 bytes (under 72 KiB). Generated dependencies, caches, service data and scratch evidence contribute zero submitted bytes.
 
-The final candidate list contains no generated dependency/cache directories, package archives, database files, symbolic links or new submodules. The temporary dependency link used for local checks was removed. No file under `.git/`, `.github/`, `.env`, root `node_modules/`, `lib/`, or the existing build/dependency configuration was changed. No commit/staging operation was performed; these are the files prepared for the assignment’s Git submission bundle.
+No new dependency archive, symlink or submodule is present. Protected contracts/tests/build configuration/manifests/lockfiles/dependencies and `.gitignore` files are unchanged. Nothing under `.git/`, `.github/`, `.env` or `node_modules/` was edited.

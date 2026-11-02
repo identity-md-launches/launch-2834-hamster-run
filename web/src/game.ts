@@ -45,3 +45,28 @@ export function shareLink(handle: string, url = location.href): string {
   link.searchParams.set("ref", normalizeHandle(handle));
   return link.toString();
 }
+
+export const staminaBand = (stamina: bigint) =>
+  Number((stamina < 10000n ? stamina : 9999n) / 2000n);
+export const bandRange = (stamina: bigint) => {
+  const band = staminaBand(stamina);
+  return `${fmt(band * 2000)}–${fmt(band === 4 ? 10000 : band * 2000 + 1999)}`;
+};
+export function matchFromUrl(): bigint | null {
+  try {
+    return integer(
+      new URL(location.href).searchParams.get("match") || "",
+      1n,
+      (1n << 256n) - 1n,
+    );
+  } catch {
+    return null;
+  }
+}
+export function matchLink(id: bigint): string {
+  const url = new URL(location.href);
+  url.search = "";
+  url.searchParams.set("match", id.toString());
+  url.hash = "play";
+  return url.toString();
+}

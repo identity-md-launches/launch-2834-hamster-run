@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection, useWalletClient } from "wagmi";
-import { decodeEventLog, type Hash, type TransactionReceipt } from "viem";
+import { type Hash, type TransactionReceipt } from "viem";
 import {
   abi,
   addresses,
@@ -18,10 +18,11 @@ import {
   type ContractName,
   type Core,
   type Pet,
-  type Race,
+  type Snapshot,
 } from "./chain";
 import { fmt, integer, trainState, validStart } from "./game";
 import { Wallet } from "./Wallet";
+import { Racing } from "./Racing";
 import {
   InviteLeaderboard,
   InvitePanel,
@@ -35,7 +36,7 @@ import {
 
 type View = "play" | "invites" | "leaderboards";
 type Notice = { where: string; text: string; error?: boolean; hash?: Hash };
-type Send = (
+export type Send = (
   where: string,
   contract: ContractName,
   method: string,
@@ -61,12 +62,19 @@ export default function App() {
   const snap = useQuery({
     queryKey: ["snapshot"],
     queryFn: snapshot,
-    refetchInterval: 20_000,
+    refetchInterval: 12_000,
   });
   const owned = useQuery({
     queryKey: ["owned", address],
-    queryFn: () => walletData(address!, snap.data!.supply, snap.data!.block),
-    enabled: Boolean(address && snap.data && !snap.isError),
+    queryFn: () => {
+      const latest = queries.getQueryData<Snapshot>(["snapshot"]);
+      if (!latest || latest.supply == null)
+        throw new Error("Refresh Sepolia before checking owned HAMs.");
+      return walletData(address!, latest.supply, latest.block);
+    },
+    enabled: Boolean(
+      address && snap.data?.supply !== null && snap.data && !snap.isError,
+    ),
     refetchInterval: 30_000,
   });
   const fresh = Boolean(
@@ -82,6 +90,14 @@ export default function App() {
       ? owned.data?.pets.find((p) => p.id === selected)
       : undefined;
   const connect = () => setOpenSignal((n) => n + 1);
+  const refresh = async () => {
+    await snap.refetch();
+    // Keep a wallet query stable while a large collection scan completes.
+    // Explicit refresh still advances ownership/Stamina to the new snapshot.
+    await queries.invalidateQueries({ queryKey: ["owned"] });
+    await queries.invalidateQueries({ queryKey: ["rivals"] });
+    await queries.invalidateQueries({ queryKey: ["inbox"] });
+  };
   useEffect(() => {
     const onHash = () => setView(currentView());
     addEventListener("hashchange", onHash);
@@ -109,7 +125,8 @@ export default function App() {
 
   const send: Send = async (where, name, functionName, args = []) => {
     const allowed =
-      name === "HamsterRunNFT" && functionName === "mint"
+      (name === "HamsterRunNFT" && functionName === "mint") ||
+      (name === "CoreReader" && functionName === "pinGenesis")
         ? canTransact
         : canWrite;
     if (!address || !wallet || !allowed || busyRef.current) return;
@@ -165,6 +182,9 @@ export default function App() {
       await queries.invalidateQueries({ queryKey: ["owned"] });
       await queries.invalidateQueries({ queryKey: ["booking"] });
       await queries.invalidateQueries({ queryKey: ["race"] });
+      await queries.invalidateQueries({ queryKey: ["active-race"] });
+      await queries.invalidateQueries({ queryKey: ["rivals"] });
+      await queries.invalidateQueries({ queryKey: ["inbox"] });
       await queries.invalidateQueries({ queryKey: ["season"] });
       return receipt;
     } catch (error) {
@@ -223,11 +243,21 @@ export default function App() {
   const mintClosed = fresh && snap.data?.mintOpen === false;
   const mintDisabled =
     !fresh ||
+    snap.data?.mintOpen == null ||
+    snap.data?.supply == null ||
     mintClosed ||
     Boolean(owned.data?.publicMinted) ||
     (snap.data?.supply ?? 0n) >= 10000n ||
     busy ||
     Boolean(address && (!canTransact || owned.isPending || owned.isError));
+  const readsHealthy = Boolean(
+    fresh &&
+      core &&
+      snap.data?.genesisPinned != null &&
+      !snap.data?.mintError &&
+      !snap.data?.wiringError &&
+      core.identity,
+  );
   const noticeAt = (where: string) => (
     <TransactionNotice notice={notice?.where === where ? notice : null} />
   );
@@ -246,9 +276,20 @@ export default function App() {
             <NavLinks view={view} />
           </nav>
           <div className="header-actions">
-            <span className="network-label">
-              <span className="status-dot good" />
-              Sepolia
+            <span
+              className="network-label"
+              aria-label={`Sepolia · ${readsHealthy ? "reads online" : snap.isPending ? "checking reads" : "reads need attention"}`}
+            >
+              <span
+                className={`status-dot ${readsHealthy ? "good" : ""}`}
+                aria-hidden="true"
+              />
+              Sepolia ·{" "}
+              {readsHealthy
+                ? "reads online"
+                : snap.isPending
+                  ? "checking"
+                  : "check reads"}
             </span>
             <Wallet openSignal={openSignal} />
           </div>
@@ -257,14 +298,24 @@ export default function App() {
           <NavLinks view={view} />
         </nav>
       </header>
-      <div className="page">
+      <div
+        className="page"
+        data-snapshot-block={fresh ? snap.data?.block.toString() : undefined}
+      >
         <CoreBanner
           core={core}
           loading={snap.isPending}
           unavailable={snap.isError}
           identityError={snap.data?.coreError}
-          refresh={() => snap.refetch()}
+          refresh={refresh}
           refreshing={snap.isFetching}
+          genesisPinned={fresh ? (snap.data?.genesisPinned ?? null) : null}
+          pinDisabled={Boolean(address && (!canTransact || !core?.identity))}
+          pin={() =>
+            address ? send("core", "CoreReader", "pinGenesis") : connect()
+          }
+          connected={Boolean(address)}
+          notice={noticeAt("core")}
         />
         <main id="main" tabIndex={-1}>
           {view === "play" && (
@@ -273,6 +324,9 @@ export default function App() {
                 <div>
                   <h1>Small paws. Big adventures.</h1>
                   <p>A little hamster game on Sepolia.</p>
+                  <a className="game-jump" href="#racing">
+                    Find a rival ↓
+                  </a>
                 </div>
                 <a href="#how-to-play" className="text-button">
                   How to play <span aria-hidden="true">↓</span>
@@ -303,7 +357,11 @@ export default function App() {
                   <div className="mint-supply">
                     <span>Hamsters minted</span>
                     <strong>
-                      {fresh ? fmt(snap.data?.supply) : "—"}{" "}
+                      {fresh && snap.data?.supply != null
+                        ? fmt(snap.data.supply)
+                        : snap.isPending
+                          ? "Checking…"
+                          : "Unavailable"}{" "}
                       <span>/ 10,000</span>
                     </strong>
                   </div>
@@ -311,8 +369,8 @@ export default function App() {
                     className="supply-track"
                     role="img"
                     aria-label={
-                      fresh
-                        ? `${fmt(snap.data?.supply)} of 10,000 minted`
+                      fresh && snap.data?.supply != null
+                        ? `${fmt(snap.data.supply)} of 10,000 minted`
                         : "Supply unavailable"
                     }
                   >
@@ -335,7 +393,7 @@ export default function App() {
                         ? "Your HAM is already minted"
                         : mintClosed
                           ? "Mint closed"
-                          : snap.isError
+                          : snap.isError || (fresh && snap.data?.mintError)
                             ? "Mint unavailable"
                             : !fresh
                               ? "Checking mint…"
@@ -344,20 +402,28 @@ export default function App() {
                   </button>
                   <p className="mint-help small">
                     {mintClosed
-                      ? "Mint closed / owner wiring pending"
-                      : fresh && !snap.data?.wired
-                        ? "Mint open. Training and race wiring pending."
-                        : snap.isError
-                          ? "Refresh to check mint status."
+                      ? "Mint closed. The collection owner can open it."
+                      : snap.isError || (fresh && snap.data?.mintError)
+                        ? "Refresh to check mint status."
+                        : fresh &&
+                            snap.data?.mintOpen === true &&
+                            !snap.data?.wired
+                          ? "Mint open. Game wiring needs verification."
                           : owned.data?.publicMinted
                             ? "One lifetime public mint per wallet."
                             : "0 ETH mint price · Sepolia gas only"}
                   </p>
                   <div className="mint-state small">
-                    <span className="muted">mintOpen</span>
-                    <code>
-                      {fresh ? String(snap.data?.mintOpen) : "unknown"}
-                    </code>
+                    <span className="muted">Mint status</span>
+                    <span>
+                      {fresh && snap.data?.mintOpen != null
+                        ? snap.data.mintOpen
+                          ? "Open"
+                          : "Closed"
+                        : snap.isPending
+                          ? "Checking…"
+                          : "Unavailable"}
+                    </span>
                     <span className="tag">Testnet only</span>
                   </div>
                   {noticeAt("mint")}
@@ -397,7 +463,7 @@ export default function App() {
                       Find my hamsters →
                     </button>
                   </div>
-                ) : !fresh && !snap.isPending ? (
+                ) : (!fresh || snap.data?.supply == null) && !snap.isPending ? (
                   <div className="lineup-empty">
                     <p>Wallet reads paused. Refresh Sepolia to retry.</p>
                     <button className="button" onClick={() => snap.refetch()}>
@@ -471,6 +537,8 @@ export default function App() {
                   notice={noticeAt("training")}
                 />
                 <Racing
+                  snapshot={fresh ? snap.data : undefined}
+                  connect={connect}
                   pet={selectedPet}
                   core={core}
                   address={address}
@@ -652,7 +720,17 @@ function CoreBanner({
   identityError,
   refresh,
   refreshing,
+  genesisPinned,
+  pinDisabled,
+  pin,
+  connected,
+  notice,
 }: {
+  genesisPinned: bigint | null;
+  pinDisabled: boolean;
+  pin: () => unknown;
+  connected: boolean;
+  notice: React.ReactNode;
   core: Core | null;
   loading: boolean;
   unavailable: boolean;
@@ -663,7 +741,7 @@ function CoreBanner({
   const unknown = unavailable || !core;
   return (
     <aside
-      className={`core-banner ${!loading && (unknown || core?.paused || !core?.identity) ? "core-warning" : ""}`}
+      className={`core-banner ${!loading && (unknown || core?.paused || !core?.identity || genesisPinned === 0n) ? "core-warning" : ""}`}
       aria-label="Core certification status"
     >
       <div className="core-icon" aria-hidden="true">
@@ -679,15 +757,17 @@ function CoreBanner({
         <strong>
           {loading
             ? "Checking Core’s frontier…"
-            : unknown
-              ? "Core unavailable · work unknown"
-              : !core.identity
-                ? "Core identity changed · settlement deferred"
-                : core.paused
-                  ? "Core paused · training deferred"
-                  : core.lag > 0n
-                    ? "Core is catching up"
-                    : "Core is up to date"}
+            : genesisPinned === 0n
+              ? "Core genesis needs pinning"
+              : unknown
+                ? "Core unavailable · work unknown"
+                : !core.identity
+                  ? "Core identity check failed · settlement deferred"
+                  : core.paused
+                    ? "Core paused · training deferred"
+                    : core.lag > 0n
+                      ? "Core is catching up"
+                      : "Core is up to date"}
         </strong>
         <p className="small">
           {loading
@@ -702,13 +782,29 @@ function CoreBanner({
             {unknown
               ? identityError || "No current Core snapshot is available."
               : !core.identity
-                ? "The adapter’s pinned Core checks are failing. Work settlement is disabled for review."
+                ? "The adapter’s pinned Core checks could not be verified. Work settlement is disabled; refresh or review the integration."
                 : core.paused
                   ? "Core is paused. Bookings remain pending until it resumes and certifies their full window."
                   : "Training only settles when the full six-round window is certified. Uncertified work is never counted as zero."}{" "}
             {core && `Snapshot: Sepolia block ${core.block}.`}
           </p>
         </details>
+        {genesisPinned === 0n && (
+          <div className="pin-action">
+            <p className="small">
+              Pin the verified calendar once. Anyone can do it; Sepolia gas is
+              required.
+            </p>
+            <button
+              className="button button-small"
+              disabled={pinDisabled}
+              onClick={pin}
+            >
+              {connected ? "Pin genesis" : "Connect to pin genesis"}
+            </button>
+          </div>
+        )}
+        {notice}
       </div>
       <button
         className="icon-button"
@@ -793,7 +889,7 @@ function Training({
       </div>
       <p className="muted">
         {wiringPending
-          ? "Owner wiring pending. Training is not open yet."
+          ? "Training unavailable until game wiring is verified."
           : pet
             ? `HAM #${pet.id} is ready to plan a run.`
             : "Select an owned HAM to book a run."}
@@ -941,310 +1037,6 @@ function BookingView({ b, core }: { b: Booking; core: Core | null }) {
                 : "Work is unknown until the whole window is certified."}
       </p>
     </div>
-  );
-}
-
-function Racing({
-  pet,
-  core,
-  address,
-  canWrite,
-  wiringPending,
-  send,
-  notice,
-}: {
-  pet?: Pet;
-  core: Core | null;
-  address?: `0x${string}`;
-  canWrite: boolean;
-  wiringPending: boolean;
-  send: Send;
-  notice: React.ReactNode;
-}) {
-  const [opponent, setOpponent] = useState("");
-  const [matchId, setMatchId] = useState("");
-  const [error, setError] = useState("");
-  const [lookup, setLookup] = useState<bigint | null>(null);
-  const race = useQuery({
-    queryKey: ["race", lookup?.toString(), core?.block.toString()],
-    queryFn: () => read<Race>("MatchBook", "races", [lookup], core?.block),
-    enabled: lookup !== null,
-  });
-  const active = useQuery({
-    queryKey: ["active-race", pet?.id.toString(), core?.block.toString()],
-    queryFn: () =>
-      read<bigint>("MatchBook", "activeMatch", [pet!.id], core?.block),
-    enabled: Boolean(pet),
-  });
-  useEffect(() => {
-    if (active.data && active.data > 0n) {
-      setLookup(active.data);
-      setMatchId(active.data.toString());
-    }
-  }, [active.data]);
-  const data = race.isError ? undefined : race.data;
-  const seedSaved = data ? BigInt(data.seed) !== 0n : false;
-  const hashAvailable = Boolean(
-    data &&
-    core &&
-    core.block > data.randomBlock &&
-    core.block <= data.randomBlock + 256n,
-  );
-  const ready = Boolean(
-    data?.state === 2 &&
-    core &&
-    core.timestamp >= data.readyAt &&
-    (seedSaved || hashAvailable),
-  );
-  const expired = Boolean(
-    data &&
-    core &&
-    ((data.state === 1 && core.timestamp >= data.offeredAt + 3600n) ||
-      (data.state === 2 && !seedSaved && core.block > data.randomBlock + 256n)),
-  );
-  const challenge = async (e: FormEvent) => {
-    e.preventDefault();
-    setError("");
-    try {
-      if (!pet) throw new Error("Select an owned HAM first.");
-      const second = integer(opponent, 1n, 10000n);
-      if (second === pet.id)
-        throw new Error("Choose a HAM owned by another wallet.");
-      const receipt = await send("race", "MatchBook", "challenge", [
-        pet.id,
-        second,
-      ]);
-      if (receipt)
-        for (const log of receipt.logs) {
-          try {
-            const event = decodeEventLog({
-              abi: abi("MatchBook"),
-              data: log.data,
-              topics: log.topics,
-            });
-            if (event.eventName === "Challenged") {
-              const id = (event.args as unknown as { matchId: bigint }).matchId;
-              setMatchId(id.toString());
-              setLookup(id);
-            }
-          } catch {
-            /* logs from other contracts */
-          }
-        }
-    } catch (e) {
-      setError(readableError(e));
-    }
-  };
-  return (
-    <section className="panel race-panel">
-      <div className="section-heading">
-        <h2>A friendly 1v1</h2>
-        <span className="tag lilac">Optional</span>
-      </div>
-      <p className="muted">
-        {wiringPending
-          ? "Owner wiring pending. Racing is not open yet."
-          : "A little competition, a lot of tiny feet."}
-      </p>
-      <form onSubmit={challenge}>
-        <label htmlFor="opponent">Opponent HAM ID</label>
-        <div className="inline-form">
-          <input
-            id="opponent"
-            inputMode="numeric"
-            name="opponent"
-            placeholder="Their HAM number"
-            value={opponent}
-            onChange={(e) => {
-              setOpponent(e.target.value);
-              setError("");
-            }}
-            aria-describedby="race-hint race-error"
-          />
-          <button
-            className="button"
-            disabled={!canWrite || !pet || pet.locked || !core}
-          >
-            Challenge →
-          </button>
-        </div>
-        <p id="race-hint" className="small muted">
-          Same Stamina band, different owner. Five accepted races per HAM and
-          wallet each week. 24-hour rematch cooldown.
-        </p>
-      </form>
-      <div className="race-track" aria-hidden="true">
-        <span className="track-ham">
-          <img src="./hamster.svg" width="48" height="48" alt="" />
-        </span>
-        <span className="track-ham second">
-          <img src="./hamster.svg" width="48" height="48" alt="" />
-        </span>
-        <span className="finish-line" />
-      </div>
-      <div className="match-lookup">
-        <label htmlFor="match-id">Match ID</label>
-        <form
-          className="inline-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            try {
-              const id = integer(matchId, 1n);
-              setLookup(id);
-              setError("");
-              race.refetch();
-            } catch (e) {
-              setError(readableError(e));
-            }
-          }}
-        >
-          <input
-            id="match-id"
-            name="match-id"
-            inputMode="numeric"
-            value={matchId}
-            onChange={(e) => setMatchId(e.target.value)}
-            placeholder="Enter a match ID"
-          />
-          <button className="button" type="submit">
-            Load race
-          </button>
-        </form>
-      </div>
-      <p id="race-error" role="status" className="error-text small">
-        {error}
-      </p>
-      {lookup === null ? (
-        <p className="small muted">
-          Challenge a friend, then share the match ID so they can accept.
-        </p>
-      ) : race.isPending ? (
-        <p>Loading race…</p>
-      ) : race.isError ? (
-        <p className="error-text small">
-          Race unavailable. Load the match again to retry.
-        </p>
-      ) : (
-        data && (
-          <div className="race-status">
-            <h3>
-              Match #{lookup.toString()} ·{" "}
-              {
-                [
-                  "Not found",
-                  "Offered",
-                  "Running",
-                  "Settled",
-                  "Cancelled",
-                  "Expired",
-                ][data.state]
-              }
-            </h3>
-            {data.state > 0 && (
-              <p className="small">
-                HAM #{data.first.toString()} vs #{data.second.toString()} · week{" "}
-                {data.week.toString()}
-              </p>
-            )}
-            {data.state === 1 && (
-              <>
-                <p className="small muted">
-                  Send match #{lookup.toString()} to the other owner. Offers
-                  expire after one hour or at week end. Challenging locks your
-                  HAM until resolved.
-                </p>
-                <div className="button-row">
-                  <button
-                    className="button"
-                    disabled={
-                      !canWrite ||
-                      address?.toLowerCase() !==
-                        data.secondOwner.toLowerCase() ||
-                      Boolean(
-                        core &&
-                        (core.week !== data.week ||
-                          core.timestamp >= data.offeredAt + 3600n),
-                      )
-                    }
-                    onClick={() =>
-                      send("race", "MatchBook", "accept", [lookup])
-                    }
-                  >
-                    Accept challenge
-                  </button>
-                  <button
-                    className="text-button"
-                    disabled={
-                      !canWrite ||
-                      address?.toLowerCase() !== data.firstOwner.toLowerCase()
-                    }
-                    onClick={() =>
-                      send("race", "MatchBook", "cancel", [lookup])
-                    }
-                  >
-                    Cancel challenge
-                  </button>
-                </div>
-              </>
-            )}
-            {data.state === 2 && (
-              <>
-                <p className="small muted">
-                  {seedSaved
-                    ? "Race seed saved."
-                    : `Randomness block ${data.randomBlock}; capture before block ${data.randomBlock + 257n}.`}{" "}
-                  At least 15 seconds and the future block must pass. Both HAMs
-                  are locked.
-                </p>
-                <div className="button-row">
-                  <button
-                    className="button"
-                    disabled={!canWrite || !ready}
-                    onClick={() =>
-                      send("race", "MatchBook", "settle", [lookup])
-                    }
-                  >
-                    Settle race
-                  </button>
-                  <button
-                    className="text-button"
-                    disabled={!canWrite || seedSaved || !hashAvailable}
-                    onClick={() =>
-                      send("race", "MatchBook", "captureRandomness", [lookup])
-                    }
-                  >
-                    Save race seed
-                  </button>
-                </div>
-              </>
-            )}
-            {data.state === 3 && (
-              <p>
-                HAM #{data.winner.toString()} wins. Distances:{" "}
-                {fmt(data.firstDistance)} / {fmt(data.secondDistance)} game
-                units.
-              </p>
-            )}
-            {data.state === 5 && (
-              <p className="small muted">
-                No result or points. HAMs are unlocked; accepted-race quota
-                stays consumed.
-              </p>
-            )}
-            {(data.state === 1 || data.state === 2) && (
-              <button
-                className="text-button"
-                disabled={!canWrite || !expired}
-                onClick={() => send("race", "MatchBook", "expire", [lookup])}
-              >
-                Release expired race
-              </button>
-            )}
-          </div>
-        )
-      )}
-      {notice}
-    </section>
   );
 }
 

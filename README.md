@@ -1,12 +1,12 @@
 # HamsterRun
 
-A pixel pastel Sepolia game: mint a free HAM, book six-round training, challenge another hamster, and invite friends. **Independent testnet demo only.** No official Squeek mining rights, real SQK, sensors, insurance, or transferable points.
+A pixel pastel Sepolia game: mint a free HAM, train, and challenge another owner. **Independent testnet demo only.** No official Squeek mining rights, SQK yield, sensors, insurance, or transferable points.
 
-The current website is in `web/`; the complete static export is in `dist/`. It uses the six live contracts from the pinned deployment receipt on chain **11155111**, with the exact previous demo ABIs. `web/src/deployment.json` records the addresses, source commit and expected ABI hashes. The earlier Solidity implementation and `demo/` remain intact. This website task broadcasts no transactions and changes no contracts.
+The React/TypeScript site is in `web/`; the complete static export is at root `dist/`. This revision keeps the deployed Sepolia contracts and their ABIs unchanged. Runtime addresses, RPCs and chain metadata load from `dist/imd-deployment.json`, copied from the pinned deployment/network handoff. All six canonical ABI hashes match that handoff. The read provider's chain and all six contracts' code are checked before writes are enabled.
 
 ## Install, preview and rebuild
 
-Use Node 24 or newer and npm. From the repository root:
+Use Node 24 or newer and npm, from the repository root:
 
 ```sh
 npm ci --prefix web
@@ -16,75 +16,62 @@ npm run build --prefix web
 npm run preview --prefix web -- --port 4173
 ```
 
-Open `http://localhost:4173`. The production build writes **root `dist/`**, including `index.html`, local fonts, illustrations, wallet marks, favicon, share image and configuration. Vite uses `base: './'`; asset URLs are relative and navigation uses hashes. Serve the whole export at any static gateway subpath. No CDN, package registry, secret, or backend is needed to render the site or read/play the on-chain game. RPC access and a visitor-approved Sepolia wallet are needed for game actions. The publisher serves the supplied export; it need not rebuild.
+Open `http://localhost:4173`. `npm run dev --prefix web` starts source development. Vite builds root `dist/`, uses `base: './'`, bundles local fonts/illustrations/wallet marks, and uses hash navigation. Serve the whole export at a static gateway subpath; no server rewrites or CDN assets are required. Keep `imd-deployment.json` and `site-config.json` beside `index.html`. The publisher serves the delivered export without rebuilding it. The historical `demo/` is preserved; use `dist/` for this site.
 
-`npm run dev --prefix web` starts source development. `demo/` is the historical vanilla-JavaScript demo and still has its historical deployment-pending configuration; use `dist/` for this delivery.
+The task's protected manifests and dependencies were left unchanged. For this worker's checks, the unchanged `web/package.json` and lockfile were installed in a temporary build copy; the exact source was mirrored there, the normal scripts ran, and its complete production export was copied back to `dist/`. No dependency directory or cache is included in the submission.
 
-## Playing honestly
+## Challenge and accept
 
-- Connect through the single wallet control. Desktop extensions are discovered by EIP-6963. Phone browsers offer MetaMask, Coinbase Wallet, Rabby and Phantom deep links. Coinbase Wallet can also offer a passkey wallet. No relay or project ID is used.
-- If `mintOpen` is false, the page says **“Mint closed / owner wiring pending”** and disables minting. Free means a **0 ETH price**, with Sepolia gas still required. `publicMinted` enforces the lifetime one-mint allowance, even after transferring away a HAM. Unknown mint state also disables the action. On-chain code and owner wiring are read before writes are enabled.
-- Select an owned HAM. The NFT is not enumerable, so ownership is scanned in bounded RPC batches at one snapshot block; only confirmed owners and Stamina values are displayed. Large wallets/collections can take longer to load.
-- Choose six wholly future rounds in the current genesis-aligned day. Booking is permanent for that HAM/day. Inspect earlier Core days to settle old bookings. A persistent, non-dismissible status banner appears on every view. Uncertified work is **unknown**, never zero. Pause or pin-check failure disables training settlement. Booking/racing do not invent certified work.
-- A 1v1 challenge locks the challenger; acceptance locks both HAMs. Same Stamina band, different owners, five accepted races per HAM and wallet per week, and a 24-hour rematch cooldown apply. Share the displayed match ID; the other owner loads and accepts it. Capture the seed promptly, settle after the future block and 15-second minimum, or release an eligible expired race. All these calls go through the visitor’s wallet.
-- The on-chain weekly score is **`trainWork + floor(summed raceDistance / 100)`**. It is distinct from wallet points and the off-chain invite board. A finalized week can exclude uncertified trains after the contract’s two-week grace; those bookings can still train their NFTs later.
+1. Connect explicitly using the header control or a game Connect action. EIP-6963 discovers desktop extensions; phones offer MetaMask, Coinbase Wallet, Rabby and Phantom browser links plus Coinbase Smart Wallet. The sheet stays closed on initial load. A wrong-chain wallet gets **Switch to Sepolia**; transactions require chain **11155111** and Sepolia gas.
+2. Select an owned HAM. **Find a rival** jumps to the race panel. Rivals have another owner, no match lock, and the same band `floor(min(Stamina, 9999) / 2000)`. Display labels count bands 1–5; the ranges are 0–1,999, 2,000–3,999, 4,000–5,999, 6,000–7,999 and 8,000–10,000. In particular, 10,000 belongs to the top band.
+3. Choose **Challenge** beside a rival. Ownership, Stamina and locks are rechecked; simulation enforces the contract's five accepted races per HAM/wallet/week and 24-hour pair cooldown. The wallet confirms one existing MatchBook challenge transaction. Only the challenger locks during the offer.
+4. After confirmation, the site reads the `Challenged` event, opens the match, updates `?match=<id>#play`, and attempts to copy both the ID and full link. Clipboard permission can be refused after wallet confirmation; a selectable link and **Copy match ID & link** provide recovery.
+5. **Pending challenges** lists this wallet's incoming and outgoing Offered matches. The invited owner selects **Accept**; the challenger selects **Cancel**. A shared `?match=<id>` link also opens the race directly, with an explicit Connect action if needed. The lookup accepts a number or a complete link. Transferred targets, changed bands, limits and cooldowns remain subject to fresh transaction simulation.
+6. The stepper shows **Offered → Accepted → Save seed → Settle**. Offers have a **1h TTL**, and acceptance also ends at week rollover. Acceptance locks both HAMs and selects **acceptance block +2**. Save the hash in blocks `target+1` through `target+256`, inclusive; it is unavailable in the target block itself. Settlement additionally requires **at least 15 seconds** after acceptance. These gates use the latest read block/timestamp, not a guessed browser timer. Settle can capture an available hash itself; a saved seed remains usable after the capture window, including during a Core read failure. An unsaved hash after `target+256` can only expire. The creator can cancel an unaccepted offer; anyone can release it after its full TTL. Accepted races cannot be cancelled.
 
-## Persistent off-chain invites
+Discovery scans 80 minted IDs per page at one snapshot block, with bounded concurrency. The checked range and **Check more HAMs** make partial coverage explicit. The inbox checks the newest 60 race IDs per page and offers **Check earlier matches**; it does not silently claim a complete scan of a large history. Both lists have retry states. Rival availability polls every 30 seconds, the inbox every 15 seconds, and the main snapshot every 12 seconds; confirmed writes invalidate all affected queries. No indexer, auto-queue, new MatchBook, mainnet flow or live transaction is supplied by this task.
 
-A static gateway cannot share invite counts on its own. A small **Node + SQLite service is included**, with no signing key, paid account, new contract, or third-party database required. It stores handle registrations, expiring signature challenges and verified mint credits. The committed site does not pretend this service is deployed: without it, links can be created, but registration/credit and the shared board show an explicit unavailable state.
+## Core, mint and training
 
-For a complete local site and invite service, after installing and building:
+Mint, Core and game wiring have separate read results. A Core or wiring error cannot erase successfully read mint supply/availability. Failed mint reads show **Unavailable** and disable mint; the Sepolia health dot only turns green after the required reads succeed. It describes reads being online, not certification being caught up. The mint panel uses Open/Closed/Unavailable rather than raw `mintOpen` debug text.
+
+When `CoreReader.genesisTimestamp == 0`, the banner offers permissionless **Pin genesis** (or **Connect to pin genesis**). It simulates `pinGenesis()` and never invents a genesis value. The CTA does not depend on completed game wiring. An unreadable pin state is not guessed to be zero. Once pinned, the banner continues to show the actual frontier, current round and unknown closed-round lag. A pin does not certify work.
+
+Training retains the existing six-round, wholly future, current-day booking flow. Stamina comes only from certified delta cumulative physical work. Uncertified rounds remain **Unknown**, never zero; pause and failed identity checks defer settlement. There are no alternative Core addresses or invented work estimates. Refreshing Sepolia also refreshes wallet ownership/Stamina from the new snapshot. Background wallet polling uses a stable query every 30 seconds so a large collection scan can finish. The weekly score remains `trainWork + floor(summed raceDistance / 100)`, separate from address points and invite mints.
+
+The public read-only smoke check observed open minting and one HAM minted, with a pinned but lagging Core. These are observations at the block recorded in `artifacts/chain-preflight.json`, not promises about subsequent chain state. No live mint, challenge, acceptance, settlement, pin or owner action was sent.
+
+## Invite service: explicitly offline until configured
+
+The provided and hosted `site-config.json` both have an empty `inviteServiceUrl`. No real public service URL was supplied. This export therefore shows the invite service and board as **offline** immediately after reading configuration. It does not guess `./api`, spin indefinitely on Loading, invent players, or claim registrations/counts are saved. Local share links can still be created; registration and attribution require the service.
+
+To enable a real service, set `web/public/site-config.json`'s `inviteServiceUrl` to its **actual absolute HTTPS API base**, then rebuild. HTTP is allowed only for explicit localhost/127.0.0.1 development. Configuration requests time out after 8 seconds; API requests after 12 seconds. Invalid JSON, unhealthy responses and malformed leaderboard data produce recoverable offline/error states. Failed boards stop automatic polling and expose Retry.
+
+The existing Node + SQLite service is retained, with signature-bound registration/attribution, persistent mint credits, replay/self-referral protection and canonical Sepolia receipt checks. It needs no private signing key or new contract. For local development, explicitly set the config URL to `http://127.0.0.1:8787/api`, rebuild, then run:
 
 ```sh
 npm run service --prefix web -- --port 8787 --static ../dist
 ```
 
-Open `http://127.0.0.1:8787/`. The same server serves the production export and `/api`. Its database is `web/service/data/invites.sqlite`, excluded from Git. Preserve that database and its SQLite sidecars when operating or backing up the service. To choose durable storage and a different port:
+Open `http://127.0.0.1:8787/`. Preserve `web/service/data/invites.sqlite` and its sidecars. `--db` chooses another durable file, `--origin` declares allowed site origins, and `--host`/`--port`/`--rpc` configure the listener/public verifier. Production operation needs the service's real HTTPS ingress and CORS origin; this task does not publish or operate one.
 
-```sh
-npm run service --prefix web -- --port 8787 --db /tmp/hamsterrun-invites.sqlite --static ../dist
-```
+Handles remain self-reported, not X-verified. `?ref=handle` attribution requires a registered referrer, a successful public mint and the minting wallet's free signature. Invite failure never reverses minting; the wallet can retry a pending credit on Invite friends. Credits are once per minting wallet and give no on-chain rewards. The existing service does not automate deep-reorg reconciliation or multi-region replication.
 
-For a separately hosted service, configure the public HTTPS API base in `web/public/site-config.json` as `inviteServiceUrl`, then rebuild. Empty means `./api` relative to the site. Pass the actual site origin to the service with `--origin`; multiple origins are comma-separated. The service also accepts `--host`, `--port`, `--db`, `--static` and an optional `--rpc` URL. Run it behind your chosen HTTPS ingress. Hosting and a production domain are outside this delivery; no invented endpoint or credential is embedded in the export.
+## Validation
 
-Invite sequence:
+See [artifacts/validation.md](artifacts/validation.md) for actual results, six-domain Better Interface coverage, fixes and limitations, and [DESIGN.md](DESIGN.md) for the final tokens/components/responsive behavior.
 
-1. Enter an X handle. One leading `@` is stripped; letters become lowercase; only 1–15 letters, numbers and underscores are allowed. Handles are **self-reported, not X-verified**. Connect and sign a five-minute, one-use registration message. One wallet registers one immutable handle.
-2. Copy the generated link or open the X compose intent. Links use the current site’s real URL, preserve its gateway subpath, remove other query/hash state, and append `?ref=handle`. The site never posts automatically.
-3. A visitor arriving with that query mints. After two receipt confirmations, the site requests a free signature binding the minting wallet, referrer, transaction, chain, collection, site, nonce and expiry. The backend verifies the signature and the real Sepolia receipt, checks the HAM mint event, checks `publicMinted` changed from false to true across the receipt block, and checks the canonical block hash. This also accepts a bundled smart-wallet mint; an owner mint or transfer alone is ineligible.
-4. SQLite transactions and wallet uniqueness allow one credit per minting wallet and reject self-referrals by wallet address. Multiple wallets may legitimately mint in one bundled transaction. Requests replay safely; failed or unconfirmed mints do not count. The leaderboard ranks actual recorded counts descending, then handle alphabetically. No sample players are shipped.
-5. If the service or signature is unavailable after mint, the mint remains successful. A **local retry receipt**, not a leaderboard or shared count, is saved for that wallet. Open Invite friends and use “Save invite credit” to retry. An unknown referrer must register before credit can be saved.
-
-The service verifies at least two confirmations and retains receipt block hashes. It is a small demo service, not a chain indexer: deep reorg reconciliation and multi-region replication are not automated. POST requests are limited to 40 per direct client IP per minute; CORS allows only the service’s origin or explicitly configured origins. No private key or on-chain authority lives in the service.
-
-## Checks and review
-
-Actual outcomes, screenshots, six-domain Better Interface coverage, fixes and unperformed checks are in [artifacts/validation.md](artifacts/validation.md). The implemented visual system is in [DESIGN.md](DESIGN.md).
-
-- Production build, TypeScript check and all six canonical ABI hashes: **passed**.
-- Persistent invite service tests: **6/6 passed**, including signature/replay protection, once-only attribution, self-referrals, receipt validation and restart persistence.
-- Browser interaction checks: **22 passed** on the production export, including mint/referral handoff, training frontier/paused states, 1v1 settlement, exact weekly score, signed handle registration, and wallet/network/error recovery. These writes use explicit controlled RPC/wallet fixtures; they are not live transactions.
-- Design probe: **16/16 passed**, both online and offline, at 320, 390 and 1440. Additional responsive checks cover 760 and 1080. Play and invite axe scans returned zero violations in the tested states.
-- Live read observed Sepolia supply 0, closed mint and a delayed Core frontier. The owner still controls mint opening; this build does not open it or wait for upstream certification.
-- WebKit could not launch because system libraries are missing. Physical wallets, a real Coinbase passkey session, native zoom and screen readers were not exercised. The tool-managed browser could not locate Chrome; rendered checks used a separately installed Playwright Chromium.
-
-Re-run the service checks without a browser or live chain:
+The production build, TypeScript check, all six ABI hash checks, and six invite-service tests passed. The controlled production-browser suite passes 26 scenario groups and two zero-violation axe scans covering rival filters/pagination, challenge/copy, both acceptance paths, inbox pagination/cancellation, exact hash/TTL boundaries, maximum-ID reflow, pin/mint/Core failures, training certification, phone wallet choices and five responsive widths. Transaction paths use explicit test RPC/wallet fixtures; no test account or fixture state is in the application bundle. Public-chain checks are read-only and separate.
 
 ```sh
 npm run test:service --prefix web
+PLAYWRIGHT_BROWSERS_PATH=/opt/imd-tools/ms-playwright node web/scripts/validate-browser.mjs --playwright /opt/imd-tools/playwright-mcp/node_modules/playwright/index.mjs
+NODE_USE_ENV_PROXY=1 PLAYWRIGHT_BROWSERS_PATH=/opt/imd-tools/ms-playwright node web/scripts/inspect-live.mjs --playwright /opt/imd-tools/playwright-mcp/node_modules/playwright/index.mjs
 ```
 
-To repeat browser validation with tools installed outside the repository:
+The browser module paths above identify the assignment's provided tools; elsewhere supply your own installed Playwright path/browser location. Both scripts own their local subpath preview and Chromium for one bounded foreground run, write disposable evidence under `test/scratch/`, and close them. The pinned taste probe is run from the repository root before delivery, at 320/390/1440 plus reduced motion, with the results recorded in validation. Those pinned inputs are removed after the assignment.
 
-```sh
-npm install --prefix /tmp/hamsterrun-checks playwright @axe-core/playwright
-PLAYWRIGHT_BROWSERS_PATH=/tmp/hamsterrun-browsers /tmp/hamsterrun-checks/node_modules/.bin/playwright install chromium
-PLAYWRIGHT_BROWSERS_PATH=/tmp/hamsterrun-browsers node web/scripts/validate-browser.mjs --playwright /tmp/hamsterrun-checks/node_modules/playwright/index.mjs --axe /tmp/hamsterrun-checks/node_modules/@axe-core/playwright/dist/index.mjs
-```
-
-The script owns its temporary server/browser for one foreground run and writes only to `test/scratch/interaction/` by default. Fixture accounts are generated in memory for validation, never shipped in application configuration. Browser checks need the production export and installed `web/` dependencies. The pinned taste probe was run separately; its inputs are removed by the assignment after submission.
-
-The new `web/.gitignore` has an explicit path budget: the ignore file is under 1 KiB; `web/node_modules/`, `.vite/`, `.cache/`, `coverage/`, `service/data/` and `*.tsbuildinfo` have **zero submitted bytes**. The root ignore file only adds explicit, bounded exceptions for the retained reports and six screenshots; its path budget is recorded in that file. Root build/dependency configuration was not changed. [artifacts/bundle.md](artifacts/bundle.md) records the source/export budget. Required source, local assets, manifest, lockfile and export remain included.
+The build emits the existing nonfatal transitive `ox/tempo` warning about browser externalization of `node:worker_threads`. Real Coinbase passkey setup and wallet apps are not exercised. The managed browser tool returned “Transport closed”; rendered validation uses the provided Playwright Chromium directly. No screen-reader session, physical-device test, native 200% zoom, RTL/localization expansion or full accessibility certification is claimed. The contribution byte audit is in [artifacts/bundle.md](artifacts/bundle.md); protected files, ignore files, contract sources and Solidity tests are unchanged.
 
 ## Contract development (preserved)
 

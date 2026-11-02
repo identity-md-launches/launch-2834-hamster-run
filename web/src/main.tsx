@@ -2,8 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { walletConfig } from "./chain";
-import App from "./App";
+import { loadDeployment } from "./deployment-runtime";
 import "./style.css";
 
 const queryClient = new QueryClient({
@@ -29,12 +28,30 @@ class ErrorBoundary extends React.Component<
     );
   }
 }
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
-    <WagmiProvider config={walletConfig}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </WagmiProvider>
-  </ErrorBoundary>,
-);
+async function start() {
+  await loadDeployment();
+  const [{ walletConfig }, { default: App }] = await Promise.all([
+    import("./chain"),
+    import("./App"),
+  ]);
+  createRoot(document.getElementById("root")!).render(
+    <ErrorBoundary>
+      <WagmiProvider config={walletConfig}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </ErrorBoundary>,
+  );
+}
+start().catch(() => {
+  createRoot(document.getElementById("root")!).render(
+    <main className="page startup-error">
+      <h1>HamsterRun</h1>
+      <p>Sepolia configuration could not load. Reload to retry.</p>
+      <button className="button" onClick={() => location.reload()}>
+        Reload game
+      </button>
+    </main>,
+  );
+});
